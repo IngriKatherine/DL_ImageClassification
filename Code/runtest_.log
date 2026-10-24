@@ -1,0 +1,5 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1792875594.996458   42222 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+usage: test_Matthew.py [-h] --path PATH --split SPLIT
+test_Matthew.py: error: the following arguments are required: --path, --split

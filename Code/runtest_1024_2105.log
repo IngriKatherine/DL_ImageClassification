@@ -1,0 +1,15 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1792875910.963582   44183 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+I0000 00:00:1792875914.746200   44183 gpu_device.cc:2036] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 20795 MB memory:  -> device: 0, name: NVIDIA A10G, pci bus id: 0000:00:1e.0, compute capability: 8.6
+I0000 00:00:1792875917.256645   44238 service.cc:154] XLA service 0x73f38450f3f0 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+I0000 00:00:1792875917.256672   44238 service.cc:170]   StreamExecutor [0]: NVIDIA A10G, Compute Capability 8.6 (Driver: 13.2.0[595.84.0]; Runtime: 12.4.0; Toolkit: 12.5.0; DNN: 9.0.0)
+I0000 00:00:1792875917.271878   44238 dump_mlir_util.cc:269] disabling MLIR crash reproducer, set env var `MLIR_CRASH_REPRODUCER_DIRECTORY` to enable.
+E0000 00:00:1792875925.721406   44238 cuda_dnn.cc:435] Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.10.0.  CuDNN library needs to have matching major version and equal or higher minor version. If using a binary install, upgrade your CuDNN library.  If building from sources, make sure the library loaded at runtime is compatible with the version specified during compile configuration.
+I0000 00:00:1792875926.155874   44238 device_compiler.h:208] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.
+Model used: /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras (image size 200)
+Predicted 2592 images of split "test". Results saved to /home/ubuntu/DL_ImageClassification/Code/results_Matthew.xlsx
+f1_score macro 0.4587214633475289
+cohen_kappa_score 0.323490445049762
+accuracy_score 0.4679783950617284
+Average of Metrics :  0.41673010115300646

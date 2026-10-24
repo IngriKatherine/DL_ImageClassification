@@ -1,0 +1,10 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1792875734.807248   43092 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Traceback (most recent call last):
+  File "/home/ubuntu/DL_ImageClassification/Code/test_Matthew.py", line 231, in <module>
+    test()
+    ~~~~^^
+  File "/home/ubuntu/DL_ImageClassification/Code/test_Matthew.py", line 71, in test
+    raise FileNotFoundError('Folder not found: {}'.format(excel_dir))
+FileNotFoundError: Folder not found: /home/ubuntu/Data/excel

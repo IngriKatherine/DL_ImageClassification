@@ -1,0 +1,2 @@
+date,norm,hidden,dropout,batchnorm,weight_decay,lr,epochs_run,best_epoch,batch,image_size,monitor,seed,val_f1_macro,val_kappa,val_acc,test_f1_macro,test_kappa,test_acc
+2026-10-24 20:53,zscore,"[300, 200, 100, 100, 80, 50]",0.0,False,0.0,0.001,30,7,32,200,val_f1_macro,42,0.48030280917787266,0.33607895936605625,0.47912360479537,0.4587214633475289,0.323490445049762,0.4679783950617284

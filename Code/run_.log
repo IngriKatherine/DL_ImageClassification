@@ -1,0 +1,217 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1792870404.035578   10134 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+I0000 00:00:1792870412.874794   10134 gpu_device.cc:2036] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 20795 MB memory:  -> device: 0, name: NVIDIA A10G, pci bus id: 0000:00:1e.0, compute capability: 8.6
+SETTINGS: NORM_MODE=zscore | HIDDEN=[300, 200, 100, 100, 80, 50] | DROPOUT=0.0 | BATCHNORM=False | WEIGHT_DECAY=0.0 | LR=0.001 | EPOCHS=30 | BATCH=32 | IMAGE_SIZE=200 | VAL_FRACTION=0.2 | MONITOR=val_f1_macro | SEED=42
+Training images: 9674   Validation images: 2419
+Computing normalization statistics on the training images ...
+  images used: 9674   pixel range [0.000, 1.000]   mean of pmean 0.503   mean of pstd 0.181
+Epoch 1/30
+I0000 00:00:1792870539.476816   10134 service.cc:154] XLA service 0x11d8e120 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+I0000 00:00:1792870539.476898   10134 service.cc:170]   StreamExecutor [0]: NVIDIA A10G, Compute Capability 8.6 (Driver: 13.2.0[595.84.0]; Runtime: 12.4.0; Toolkit: 12.5.0; DNN: 9.0.0)
+I0000 00:00:1792870539.585691   10134 dump_mlir_util.cc:269] disabling MLIR crash reproducer, set env var `MLIR_CRASH_REPRODUCER_DIRECTORY` to enable.
+E0000 00:00:1792870558.469496   10134 cuda_dnn.cc:435] Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.10.0.  CuDNN library needs to have matching major version and equal or higher minor version. If using a binary install, upgrade your CuDNN library.  If building from sources, make sure the library loaded at runtime is compatible with the version specified during compile configuration.
+I0000 00:00:1792870559.805644   10134 device_compiler.h:208] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.
+W0000 00:00:1792870559.817746   10134 prefetch_dataset_op.cc:476] SEVERE STARVATION: Element UID 1792870538840539501 in buffer 'PrefetchDataset/_9' sat unconsumed for 20.4782 seconds!
+I0000 00:00:1792870691.491992   12289 subprocess_compilation.cc:349] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_50', 16 bytes spill stores, 16 bytes spill loads
+
+I0000 00:00:1792870691.781508   12289 subprocess_compilation.cc:349] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_50', 8 bytes spill stores, 8 bytes spill loads
+
+I0000 00:00:1792870693.530013   12292 subprocess_compilation.cc:349] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_52', 8 bytes spill stores, 8 bytes spill loads
+
+E0000 00:00:1792870695.994264   10134 cuda_dnn.cc:435] Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.10.0.  CuDNN library needs to have matching major version and equal or higher minor version. If using a binary install, upgrade your CuDNN library.  If building from sources, make sure the library loaded at runtime is compatible with the version specified during compile configuration.
+E0000 00:00:1792870702.833003   10237 cuda_dnn.cc:435] Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.10.0.  CuDNN library needs to have matching major version and equal or higher minor version. If using a binary install, upgrade your CuDNN library.  If building from sources, make sure the library loaded at runtime is compatible with the version specified during compile configuration.
+E0000 00:00:1792870740.914834   10239 cuda_dnn.cc:435] Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.10.0.  CuDNN library needs to have matching major version and equal or higher minor version. If using a binary install, upgrade your CuDNN library.  If building from sources, make sure the library loaded at runtime is compatible with the version specified during compile configuration.
+  epoch   1 | train loss 2.1988 acc 0.3251 | val loss 1.4142 acc 0.4022 f1_macro 0.3585 kappa 0.2283
+
+Epoch 1: val_f1_macro improved from None to 0.35849, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 1: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 205s - 677ms/step - accuracy: 0.3251 - loss: 2.1988 - val_loss: 1.4142 - val_accuracy: 0.4022 - val_f1_macro: 0.3585 - val_kappa: 0.2283
+Epoch 2/30
+  epoch   2 | train loss 1.3789 acc 0.4180 | val loss 1.3551 acc 0.4427 f1_macro 0.4163 kappa 0.2787
+
+Epoch 2: val_f1_macro improved from 0.35849 to 0.41632, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 2: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 153s - 505ms/step - accuracy: 0.4180 - loss: 1.3789 - val_loss: 1.3551 - val_accuracy: 0.4427 - val_f1_macro: 0.4163 - val_kappa: 0.2787
+Epoch 3/30
+  epoch   3 | train loss 1.2589 acc 0.4867 | val loss 1.3403 acc 0.4787 f1_macro 0.4568 kappa 0.3264
+
+Epoch 3: val_f1_macro improved from 0.41632 to 0.45680, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 3: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 153s - 506ms/step - accuracy: 0.4867 - loss: 1.2589 - val_loss: 1.3403 - val_accuracy: 0.4787 - val_f1_macro: 0.4568 - val_kappa: 0.3264
+Epoch 4/30
+  epoch   4 | train loss 1.1691 acc 0.5358 | val loss 1.4031 acc 0.4754 f1_macro 0.4629 kappa 0.3288
+
+Epoch 4: val_f1_macro improved from 0.45680 to 0.46293, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 4: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 153s - 505ms/step - accuracy: 0.5358 - loss: 1.1691 - val_loss: 1.4031 - val_accuracy: 0.4754 - val_f1_macro: 0.4629 - val_kappa: 0.3288
+Epoch 5/30
+  epoch   5 | train loss 1.0507 acc 0.5940 | val loss 1.5753 acc 0.4816 f1_macro 0.4764 kappa 0.3359
+
+Epoch 5: val_f1_macro improved from 0.46293 to 0.47642, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 5: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 153s - 506ms/step - accuracy: 0.5940 - loss: 1.0507 - val_loss: 1.5753 - val_accuracy: 0.4816 - val_f1_macro: 0.4764 - val_kappa: 0.3359
+Epoch 6/30
+  epoch   6 | train loss 0.9608 acc 0.6360 | val loss 1.6284 acc 0.4667 f1_macro 0.4659 kappa 0.3182
+
+Epoch 6: val_f1_macro did not improve from 0.47642
+303/303 - 151s - 499ms/step - accuracy: 0.6360 - loss: 0.9608 - val_loss: 1.6284 - val_accuracy: 0.4667 - val_f1_macro: 0.4659 - val_kappa: 0.3182
+Epoch 7/30
+  epoch   7 | train loss 0.8571 acc 0.6889 | val loss 1.7222 acc 0.4791 f1_macro 0.4803 kappa 0.3361
+
+Epoch 7: val_f1_macro improved from 0.47642 to 0.48030, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 7: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 153s - 505ms/step - accuracy: 0.6889 - loss: 0.8571 - val_loss: 1.7222 - val_accuracy: 0.4791 - val_f1_macro: 0.4803 - val_kappa: 0.3361
+Epoch 8/30
+  epoch   8 | train loss 0.7557 acc 0.7245 | val loss 2.0903 acc 0.4630 f1_macro 0.4563 kappa 0.3150
+
+Epoch 8: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 499ms/step - accuracy: 0.7245 - loss: 0.7557 - val_loss: 2.0903 - val_accuracy: 0.4630 - val_f1_macro: 0.4563 - val_kappa: 0.3150
+Epoch 9/30
+  epoch   9 | train loss 0.6864 acc 0.7602 | val loss 2.2386 acc 0.4750 f1_macro 0.4712 kappa 0.3308
+
+Epoch 9: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 497ms/step - accuracy: 0.7602 - loss: 0.6864 - val_loss: 2.2386 - val_accuracy: 0.4750 - val_f1_macro: 0.4712 - val_kappa: 0.3308
+Epoch 10/30
+  epoch  10 | train loss 0.6333 acc 0.7818 | val loss 2.5459 acc 0.4266 f1_macro 0.3973 kappa 0.2613
+
+Epoch 10: val_f1_macro did not improve from 0.48030
+303/303 - 150s - 496ms/step - accuracy: 0.7818 - loss: 0.6333 - val_loss: 2.5459 - val_accuracy: 0.4266 - val_f1_macro: 0.3973 - val_kappa: 0.2613
+Epoch 11/30
+  epoch  11 | train loss 0.5909 acc 0.7989 | val loss 2.8283 acc 0.4498 f1_macro 0.4490 kappa 0.3071
+
+Epoch 11: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 498ms/step - accuracy: 0.7989 - loss: 0.5909 - val_loss: 2.8283 - val_accuracy: 0.4498 - val_f1_macro: 0.4490 - val_kappa: 0.3071
+Epoch 12/30
+  epoch  12 | train loss 0.5315 acc 0.8251 | val loss 2.5877 acc 0.4560 f1_macro 0.4391 kappa 0.3150
+
+Epoch 12: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 497ms/step - accuracy: 0.8251 - loss: 0.5315 - val_loss: 2.5877 - val_accuracy: 0.4560 - val_f1_macro: 0.4391 - val_kappa: 0.3150
+Epoch 13/30
+  epoch  13 | train loss 0.5003 acc 0.8396 | val loss 2.6385 acc 0.4779 f1_macro 0.4732 kappa 0.3397
+
+Epoch 13: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 497ms/step - accuracy: 0.8396 - loss: 0.5003 - val_loss: 2.6385 - val_accuracy: 0.4779 - val_f1_macro: 0.4732 - val_kappa: 0.3397
+Epoch 14/30
+  epoch  14 | train loss 0.4909 acc 0.8469 | val loss 2.8585 acc 0.4638 f1_macro 0.4600 kappa 0.3265
+
+Epoch 14: val_f1_macro did not improve from 0.48030
+303/303 - 150s - 497ms/step - accuracy: 0.8469 - loss: 0.4909 - val_loss: 2.8585 - val_accuracy: 0.4638 - val_f1_macro: 0.4600 - val_kappa: 0.3265
+Epoch 15/30
+  epoch  15 | train loss 0.4446 acc 0.8589 | val loss 3.1311 acc 0.4494 f1_macro 0.4499 kappa 0.3144
+
+Epoch 15: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 498ms/step - accuracy: 0.8589 - loss: 0.4446 - val_loss: 3.1311 - val_accuracy: 0.4494 - val_f1_macro: 0.4499 - val_kappa: 0.3144
+Epoch 16/30
+  epoch  16 | train loss 0.4285 acc 0.8712 | val loss 2.7491 acc 0.4543 f1_macro 0.4454 kappa 0.3086
+
+Epoch 16: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 497ms/step - accuracy: 0.8712 - loss: 0.4285 - val_loss: 2.7491 - val_accuracy: 0.4543 - val_f1_macro: 0.4454 - val_kappa: 0.3086
+Epoch 17/30
+  epoch  17 | train loss 0.4164 acc 0.8768 | val loss 3.2995 acc 0.4328 f1_macro 0.4136 kappa 0.2762
+
+Epoch 17: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 499ms/step - accuracy: 0.8768 - loss: 0.4164 - val_loss: 3.2995 - val_accuracy: 0.4328 - val_f1_macro: 0.4136 - val_kappa: 0.2762
+Epoch 18/30
+  epoch  18 | train loss 0.3822 acc 0.8854 | val loss 3.3880 acc 0.4469 f1_macro 0.4048 kappa 0.2919
+
+Epoch 18: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 497ms/step - accuracy: 0.8854 - loss: 0.3822 - val_loss: 3.3880 - val_accuracy: 0.4469 - val_f1_macro: 0.4048 - val_kappa: 0.2919
+Epoch 19/30
+  epoch  19 | train loss 0.3748 acc 0.8928 | val loss 3.0150 acc 0.4576 f1_macro 0.4456 kappa 0.3140
+
+Epoch 19: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 498ms/step - accuracy: 0.8928 - loss: 0.3748 - val_loss: 3.0150 - val_accuracy: 0.4576 - val_f1_macro: 0.4456 - val_kappa: 0.3140
+Epoch 20/30
+  epoch  20 | train loss 0.3162 acc 0.9054 | val loss 3.4957 acc 0.4440 f1_macro 0.4303 kappa 0.2964
+
+Epoch 20: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 497ms/step - accuracy: 0.9054 - loss: 0.3162 - val_loss: 3.4957 - val_accuracy: 0.4440 - val_f1_macro: 0.4303 - val_kappa: 0.2964
+Epoch 21/30
+  epoch  21 | train loss 0.3021 acc 0.9120 | val loss 4.2606 acc 0.4076 f1_macro 0.4005 kappa 0.2727
+
+Epoch 21: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 500ms/step - accuracy: 0.9120 - loss: 0.3021 - val_loss: 4.2606 - val_accuracy: 0.4076 - val_f1_macro: 0.4005 - val_kappa: 0.2727
+Epoch 22/30
+  epoch  22 | train loss 0.3276 acc 0.9093 | val loss 3.3574 acc 0.4481 f1_macro 0.4474 kappa 0.3142
+
+Epoch 22: val_f1_macro did not improve from 0.48030
+303/303 - 150s - 496ms/step - accuracy: 0.9093 - loss: 0.3276 - val_loss: 3.3574 - val_accuracy: 0.4481 - val_f1_macro: 0.4474 - val_kappa: 0.3142
+Epoch 23/30
+  epoch  23 | train loss 0.3145 acc 0.9118 | val loss 3.3485 acc 0.4601 f1_macro 0.4496 kappa 0.3150
+
+Epoch 23: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 498ms/step - accuracy: 0.9118 - loss: 0.3145 - val_loss: 3.3485 - val_accuracy: 0.4601 - val_f1_macro: 0.4496 - val_kappa: 0.3150
+Epoch 24/30
+  epoch  24 | train loss 0.2759 acc 0.9257 | val loss 3.3135 acc 0.4370 f1_macro 0.4340 kappa 0.2995
+
+Epoch 24: val_f1_macro did not improve from 0.48030
+303/303 - 150s - 496ms/step - accuracy: 0.9257 - loss: 0.2759 - val_loss: 3.3135 - val_accuracy: 0.4370 - val_f1_macro: 0.4340 - val_kappa: 0.2995
+Epoch 25/30
+  epoch  25 | train loss 0.3109 acc 0.9223 | val loss 3.2788 acc 0.4353 f1_macro 0.4363 kappa 0.2924
+
+Epoch 25: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 498ms/step - accuracy: 0.9223 - loss: 0.3109 - val_loss: 3.2788 - val_accuracy: 0.4353 - val_f1_macro: 0.4363 - val_kappa: 0.2924
+Epoch 26/30
+  epoch  26 | train loss 0.2525 acc 0.9306 | val loss 3.5979 acc 0.4390 f1_macro 0.4215 kappa 0.2961
+
+Epoch 26: val_f1_macro did not improve from 0.48030
+303/303 - 150s - 496ms/step - accuracy: 0.9306 - loss: 0.2525 - val_loss: 3.5979 - val_accuracy: 0.4390 - val_f1_macro: 0.4215 - val_kappa: 0.2961
+Epoch 27/30
+  epoch  27 | train loss 0.2778 acc 0.9302 | val loss 3.0080 acc 0.4543 f1_macro 0.4480 kappa 0.3180
+
+Epoch 27: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 498ms/step - accuracy: 0.9302 - loss: 0.2778 - val_loss: 3.0080 - val_accuracy: 0.4543 - val_f1_macro: 0.4480 - val_kappa: 0.3180
+Epoch 28/30
+  epoch  28 | train loss 0.2349 acc 0.9329 | val loss 5.0499 acc 0.4018 f1_macro 0.4010 kappa 0.2636
+
+Epoch 28: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 497ms/step - accuracy: 0.9329 - loss: 0.2349 - val_loss: 5.0499 - val_accuracy: 0.4018 - val_f1_macro: 0.4010 - val_kappa: 0.2636
+Epoch 29/30
+  epoch  29 | train loss 0.2561 acc 0.9344 | val loss 3.2615 acc 0.4564 f1_macro 0.4483 kappa 0.3049
+
+Epoch 29: val_f1_macro did not improve from 0.48030
+303/303 - 151s - 498ms/step - accuracy: 0.9344 - loss: 0.2561 - val_loss: 3.2615 - val_accuracy: 0.4564 - val_f1_macro: 0.4483 - val_kappa: 0.3049
+Epoch 30/30
+  epoch  30 | train loss 0.2416 acc 0.9403 | val loss 3.7179 acc 0.4452 f1_macro 0.4341 kappa 0.2893
+
+Epoch 30: val_f1_macro did not improve from 0.48030
+303/303 - 150s - 496ms/step - accuracy: 0.9403 - loss: 0.2416 - val_loss: 3.7179 - val_accuracy: 0.4452 - val_f1_macro: 0.4341 - val_kappa: 0.2893
+E0000 00:00:1792875130.007500   10240 cuda_dnn.cc:435] Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.10.0.  CuDNN library needs to have matching major version and equal or higher minor version. If using a binary install, upgrade your CuDNN library.  If building from sources, make sure the library loaded at runtime is compatible with the version specified during compile configuration.
+E0000 00:00:1792875157.809763   10239 cuda_dnn.cc:435] Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.10.0.  CuDNN library needs to have matching major version and equal or higher minor version. If using a binary install, upgrade your CuDNN library.  If building from sources, make sure the library loaded at runtime is compatible with the version specified during compile configuration.
+E0000 00:00:1792875160.217330   10237 cuda_dnn.cc:435] Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.10.0.  CuDNN library needs to have matching major version and equal or higher minor version. If using a binary install, upgrade your CuDNN library.  If building from sources, make sure the library loaded at runtime is compatible with the version specified during compile configuration.
+
+================ VALIDATION (best saved epoch) ================
+f1_score macro 0.48030280917787266
+cohen_kappa_score 0.33607895936605625
+accuracy_score 0.47912360479537
+Average of Metrics :  0.43183512444643296
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[107  22  26  24  13  32]
+ [ 41 140  99  19   5 141]
+ [ 11  91 311   8  32 195]
+ [ 38  18   9  79   4  18]
+ [ 19  12  43   7 136  43]
+ [ 23  71 157  16  23 386]]
+
+================ TEST ================
+f1_score macro 0.4587214633475289
+cohen_kappa_score 0.323490445049762
+accuracy_score 0.4679783950617284
+Average of Metrics :  0.41673010115300646
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[107  26  26  33  18  30]
+ [ 43 145 110  25   3 152]
+ [ 24  74 352   4  35 204]
+ [ 44  16   4  78   9  27]
+ [ 28  16  43  11 138  43]
+ [ 27  93 160  15  36 393]]
+
+SETTINGS: NORM_MODE=zscore | HIDDEN=[300, 200, 100, 100, 80, 50] | DROPOUT=0.0 | BATCHNORM=False | WEIGHT_DECAY=0.0 | LR=0.001 | EPOCHS=30 | BATCH=32 | IMAGE_SIZE=200 | VAL_FRACTION=0.2 | MONITOR=val_f1_macro | SEED=42
+Run logged in /home/ubuntu/DL_ImageClassification/Code/experiments_Matthew.csv
