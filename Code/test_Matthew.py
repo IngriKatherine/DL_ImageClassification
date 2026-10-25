@@ -148,8 +148,16 @@ def test():
     #--------------------------------------------------------------------------------------------------------------
     # Predict: softmax probabilities of every model, averaged (one model = no averaging)
     prob_sum = None
-    for mf in model_files:
-        final_model = tf.keras.models.load_model(mf, compile=False)
+    for k, mf in enumerate(model_files):
+        # loaded exactly as the grader loads it (default compile=True, optimizer state included),
+        # so the summary below is an exact match of the summary generated from the submitted model
+        final_model = tf.keras.models.load_model(mf)
+
+        if k == 0:
+            # summary_<nickname>.txt written from the loaded model, as save_model() in test_to_do.py
+            for d in local_dirs:
+                with open(os.path.join(d, 'summary_{}.txt'.format(NICKNAME)), 'w', encoding='utf-8', newline='\n') as fh:
+                    final_model.summary(print_fn=lambda x, **kwargs: fh.write(x + '\n'))
 
         n_inputs = int(final_model.input_shape[-1])
         image_size = int(round((n_inputs / CHANNELS) ** 0.5))
