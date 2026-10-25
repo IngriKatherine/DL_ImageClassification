@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 import importlib
+import re
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -11,8 +12,16 @@ from sklearn.metrics import f1_score, cohen_kappa_score, accuracy_score, matthew
 ## Additional package: openpyxl (used by pandas to read and write .xlsx files).
 ## Installed only if it is missing, with the same python that runs this script.
 ## The second command is for Ubuntu 23.04+ images that refuse plain pip installs ("externally-managed-environment").
-os.system('"{0}" -c "import openpyxl" 2>/dev/null || sudo "{0}" -m pip install -q openpyxl || '
-          'sudo "{0}" -m pip install -q --break-system-packages openpyxl'.format(sys.executable))
+## sudo -n never waits for a password (an automated run would hang); the last command needs no sudo at all.
+os.system('"{0}" -c "import openpyxl" 2>/dev/null || sudo -n "{0}" -m pip install -q openpyxl || '
+          'sudo -n "{0}" -m pip install -q --break-system-packages openpyxl || '
+          '"{0}" -m pip install -q --user openpyxl || '
+          '"{0}" -m pip install -q --user --break-system-packages openpyxl'.format(sys.executable))
+try:
+    import site
+    site.addsitedir(site.getusersitepackages())   # makes a --user install importable in this same run
+except Exception:
+    pass
 importlib.invalidate_caches()
 #------------------------------------------------------------------------------------------------------------------
 
@@ -30,10 +39,13 @@ def test():
         results_Matthew.xlsx         output: the rows of the chosen split + column "results"
                                      (predicted class index, 0 = class1 ... 5 = class6), same format as train_example.py
 
-        Image preparation is identical to train_Matthew.py / train_Matthew_v2.py:
-            decode -> resize to IMAGE_SIZE x IMAGE_SIZE -> /255 -> flatten
-        IMAGE_SIZE is read from the model itself, so it can never mismatch the training.
-        Any input normalization (minmax / zscore) is a layer inside the model.
+        Image preparation is identical to train_Matthew.py, and is read from each model, so it can never mismatch:
+            - IMAGE_SIZE from the model input size (IMAGE_SIZE*IMAGE_SIZE*3)
+            - JPEG decode ratio and antialias from the model name (e.g. MLP_Matthew_prep_r8_aa);
+              models without that tag (older ones) use full decode + resize without antialias, as they were trained
+            decode -> resize -> /255 -> flatten
+        The input normalization (minmax / zscore, with the training pmin/pmax/pmean/pstd) is the first layer INSIDE
+        the model, so it is applied automatically by final_model.predict().
     '''
 
     #--------------------------------------------------------------------------------------------------------------
@@ -124,25 +136,37 @@ def test():
         raise FileNotFoundError('model_{}.keras not found in {}'.format(NICKNAME, local_dirs))
 
     #--------------------------------------------------------------------------------------------------------------
-    def process_path(file_path, image_size):
+    def preparation_of(model):
+        '''
+            reads from the model name how its training images were prepared: (jpeg decode ratio, antialias)
+        '''
+        m = re.search(r'_prep_r(\d+)(_aa)?$', model.name)
+        if m is None:
+            return 1, False          # older models: full decode, resize without antialias
+        return int(m.group(1)), m.group(2) is not None
+
+    def process_path(file_path, image_size, ratio, antialias):
         '''
             reads one image from disk and prepares it exactly as in training:
             decode -> resize -> pixels 0-1 -> flat vector of image_size*image_size*CHANNELS values
             (no augmentation at test time)
         '''
         img = tf.io.read_file(file_path)
-        img = tf.io.decode_image(img, channels=CHANNELS, expand_animations=False)
-        img = tf.image.resize(img, [image_size, image_size])
+        if ratio > 1:
+            img = tf.io.decode_jpeg(img, channels=CHANNELS, ratio=ratio)
+        else:
+            img = tf.io.decode_image(img, channels=CHANNELS, expand_animations=False)
+        img = tf.image.resize(img, [image_size, image_size], antialias=antialias)
         img = img / 255.0
         img = tf.reshape(img, [image_size * image_size * CHANNELS])
         return img
 
-    def read_data(image_size):
+    def read_data(image_size, ratio, antialias):
         '''
             tf.data pipeline over the image paths. NOT shuffled, so predictions stay aligned with the excel rows
         '''
         list_ds = tf.data.Dataset.from_tensor_slices(ds_inputs)
-        final_ds = list_ds.map(lambda f: process_path(f, image_size), num_parallel_calls=AUTOTUNE)
+        final_ds = list_ds.map(lambda f: process_path(f, image_size, ratio, antialias), num_parallel_calls=AUTOTUNE)
         return final_ds.batch(BATCH_SIZE).prefetch(AUTOTUNE)
 
     #--------------------------------------------------------------------------------------------------------------
@@ -165,12 +189,14 @@ def test():
         if image_size * image_size * CHANNELS != n_inputs:
             raise ValueError('{} expects {} inputs, which is not IMAGE_SIZE*IMAGE_SIZE*{}'.format(mf, n_inputs, CHANNELS))
 
-        res = final_model.predict(read_data(image_size), verbose=0)
+        ratio, antialias = preparation_of(final_model)
+        res = final_model.predict(read_data(image_size, ratio, antialias), verbose=0)
         if len(res) != len(xdf_dset):
             raise ValueError('{} predictions for {} rows'.format(len(res), len(xdf_dset)))
 
         prob_sum = res if prob_sum is None else prob_sum + res
-        print('Model used: {} (image size {})'.format(mf, image_size))
+        print('Model used: {} (image size {}, jpeg ratio {}, antialias {}, first layer: {})'.format(
+            mf, image_size, ratio, antialias, final_model.layers[0].name))
 
     # the answer is the label (index of the most probable class), not the probability
     xdf_dset['results'] = np.argmax(prob_sum, axis=1)
