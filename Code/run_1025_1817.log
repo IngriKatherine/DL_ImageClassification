@@ -1,0 +1,228 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1792952273.022465    2389 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+E0000 00:00:1792952282.106535    2389 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
+I0000 00:00:1792952292.348531    2518 shuffle_dataset_op.cc:453] ShuffleDatasetV3:3: Filling up shuffle buffer (this may take a while): 866 of 9674
+I0000 00:00:1792952302.354900    2518 shuffle_dataset_op.cc:453] ShuffleDatasetV3:3: Filling up shuffle buffer (this may take a while): 1653 of 9674
+I0000 00:00:1792952322.341839    2518 shuffle_dataset_op.cc:453] ShuffleDatasetV3:3: Filling up shuffle buffer (this may take a while): 3243 of 9674
+I0000 00:00:1792952342.352353    2518 shuffle_dataset_op.cc:453] ShuffleDatasetV3:3: Filling up shuffle buffer (this may take a while): 4831 of 9674
+I0000 00:00:1792952352.369789    2518 shuffle_dataset_op.cc:453] ShuffleDatasetV3:3: Filling up shuffle buffer (this may take a while): 5589 of 9674
+I0000 00:00:1792952372.346529    2518 shuffle_dataset_op.cc:453] ShuffleDatasetV3:3: Filling up shuffle buffer (this may take a while): 7167 of 9674
+I0000 00:00:1792952392.338927    2518 shuffle_dataset_op.cc:453] ShuffleDatasetV3:3: Filling up shuffle buffer (this may take a while): 8724 of 9674
+I0000 00:00:1792952402.345407    2518 shuffle_dataset_op.cc:453] ShuffleDatasetV3:3: Filling up shuffle buffer (this may take a while): 9515 of 9674
+I0000 00:00:1792952404.304765    2518 shuffle_dataset_op.cc:483] Shuffle buffer filled.
+SETTINGS: NORM_MODE=minmax | HIDDEN=[128, 128, 96, 96, 64, 64, 64, 32, 32, 32] | DROPOUT=0.0 | BATCHNORM=True | WEIGHT_DECAY=0.0 | OPTIMIZER=adam | LR=0.001 | INIT=he_normal | CLIP=1.0 | EPOCHS=100 | EARLY_STOP=10/0.002 | SHUFFLE=True | BATCH=32 | IMAGE_SIZE=200 | JPEG_RATIO=8 | ANTIALIAS=True | VAL_FRACTION=0.2 | MONITOR=val_f1_macro | SEED=42
+Training images: 9674   Validation images: 2419
+Cache: ON  - 5.8 GB of images kept in RAM (15.3 GB free)
+Computing normalization statistics on the training images ...
+  images used: 9674   pixel range [0.000, 1.000]   mean of pmean 0.505   mean of pstd 0.176
+Model: "MLP_Matthew_prep_r8_aa"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ minmax_norm_minus1_to_1         │ (None, 120000)         │             0 │
+│ (Normalization)                 │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense (Dense)                   │ (None, 128)            │    15,360,000 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization             │ (None, 128)            │           512 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation (Activation)         │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_1 (Dense)                 │ (None, 128)            │        16,384 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_1           │ (None, 128)            │           512 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_1 (Activation)       │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_2 (Dense)                 │ (None, 96)             │        12,288 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_2           │ (None, 96)             │           384 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_2 (Activation)       │ (None, 96)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_3 (Dense)                 │ (None, 96)             │         9,216 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_3           │ (None, 96)             │           384 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_3 (Activation)       │ (None, 96)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_4 (Dense)                 │ (None, 64)             │         6,144 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_4           │ (None, 64)             │           256 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_4 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_5 (Dense)                 │ (None, 64)             │         4,096 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_5           │ (None, 64)             │           256 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_5 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_6 (Dense)                 │ (None, 64)             │         4,096 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_6           │ (None, 64)             │           256 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_6 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_7 (Dense)                 │ (None, 32)             │         2,048 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_7           │ (None, 32)             │           128 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_7 (Activation)       │ (None, 32)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_8 (Dense)                 │ (None, 32)             │         1,024 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_8           │ (None, 32)             │           128 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_8 (Activation)       │ (None, 32)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_9 (Dense)                 │ (None, 32)             │         1,024 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ batch_normalization_9           │ (None, 32)             │           128 │
+│ (BatchNormalization)            │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_9 (Activation)       │ (None, 32)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_10 (Dense)                │ (None, 6)              │           198 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 15,419,462 (58.82 MB)
+ Trainable params: 15,417,990 (58.81 MB)
+ Non-trainable params: 1,472 (5.75 KB)
+Epoch 1/100
+  epoch   1 | train loss 1.6219 f1_macro 0.2569 | val loss 1.6410 acc 0.3348 f1_macro 0.2839 kappa 0.1477
+
+Epoch 1: val_f1_macro improved from None to 0.28394, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 1: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 76s - 250ms/step - f1_macro: 0.2569 - loss: 1.6219 - val_loss: 1.6410 - val_accuracy: 0.3348 - val_f1_macro: 0.2839 - val_kappa: 0.1477
+Epoch 2/100
+  epoch   2 | train loss 1.4287 f1_macro 0.3568 | val loss 1.4005 acc 0.4146 f1_macro 0.4048 kappa 0.2474
+
+Epoch 2: val_f1_macro improved from 0.28394 to 0.40482, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 2: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 43s - 143ms/step - f1_macro: 0.3568 - loss: 1.4287 - val_loss: 1.4005 - val_accuracy: 0.4146 - val_f1_macro: 0.4048 - val_kappa: 0.2474
+Epoch 3/100
+  epoch   3 | train loss 1.3557 f1_macro 0.4242 | val loss 1.3370 acc 0.4312 f1_macro 0.4330 kappa 0.2752
+
+Epoch 3: val_f1_macro improved from 0.40482 to 0.43304, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 3: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 43s - 143ms/step - f1_macro: 0.4242 - loss: 1.3557 - val_loss: 1.3370 - val_accuracy: 0.4312 - val_f1_macro: 0.4330 - val_kappa: 0.2752
+Epoch 4/100
+  epoch   4 | train loss 1.2922 f1_macro 0.4682 | val loss 1.3116 acc 0.4523 f1_macro 0.4452 kappa 0.2955
+
+Epoch 4: val_f1_macro improved from 0.43304 to 0.44518, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 4: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 43s - 143ms/step - f1_macro: 0.4682 - loss: 1.2922 - val_loss: 1.3116 - val_accuracy: 0.4523 - val_f1_macro: 0.4452 - val_kappa: 0.2955
+Epoch 5/100
+  epoch   5 | train loss 1.2397 f1_macro 0.4889 | val loss 1.2892 acc 0.4737 f1_macro 0.4746 kappa 0.3267
+
+Epoch 5: val_f1_macro improved from 0.44518 to 0.47458, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 5: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 43s - 144ms/step - f1_macro: 0.4889 - loss: 1.2397 - val_loss: 1.2892 - val_accuracy: 0.4737 - val_f1_macro: 0.4746 - val_kappa: 0.3267
+Epoch 6/100
+  epoch   6 | train loss 1.1954 f1_macro 0.5223 | val loss 1.2757 acc 0.4746 f1_macro 0.4734 kappa 0.3352
+
+Epoch 6: val_f1_macro did not improve from 0.47458
+303/303 - 42s - 140ms/step - f1_macro: 0.5223 - loss: 1.1954 - val_loss: 1.2757 - val_accuracy: 0.4746 - val_f1_macro: 0.4734 - val_kappa: 0.3352
+Epoch 7/100
+  epoch   7 | train loss 1.1407 f1_macro 0.5524 | val loss 1.3011 acc 0.4845 f1_macro 0.4971 kappa 0.3518
+
+Epoch 7: val_f1_macro improved from 0.47458 to 0.49714, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 7: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 44s - 144ms/step - f1_macro: 0.5524 - loss: 1.1407 - val_loss: 1.3011 - val_accuracy: 0.4845 - val_f1_macro: 0.4971 - val_kappa: 0.3518
+Epoch 8/100
+  epoch   8 | train loss 1.0650 f1_macro 0.5851 | val loss 1.3176 acc 0.4795 f1_macro 0.4800 kappa 0.3304
+
+Epoch 8: val_f1_macro did not improve from 0.49714
+303/303 - 43s - 141ms/step - f1_macro: 0.5851 - loss: 1.0650 - val_loss: 1.3176 - val_accuracy: 0.4795 - val_f1_macro: 0.4800 - val_kappa: 0.3304
+Epoch 9/100
+  epoch   9 | train loss 0.9968 f1_macro 0.6206 | val loss 1.3376 acc 0.4742 f1_macro 0.4697 kappa 0.3284
+
+Epoch 9: val_f1_macro did not improve from 0.49714
+303/303 - 82s - 269ms/step - f1_macro: 0.6206 - loss: 0.9968 - val_loss: 1.3376 - val_accuracy: 0.4742 - val_f1_macro: 0.4697 - val_kappa: 0.3284
+Epoch 10/100
+  epoch  10 | train loss 0.9343 f1_macro 0.6482 | val loss 1.4136 acc 0.4675 f1_macro 0.4593 kappa 0.3249
+
+Epoch 10: val_f1_macro did not improve from 0.49714
+303/303 - 43s - 141ms/step - f1_macro: 0.6482 - loss: 0.9343 - val_loss: 1.4136 - val_accuracy: 0.4675 - val_f1_macro: 0.4593 - val_kappa: 0.3249
+Epoch 11/100
+  epoch  11 | train loss 0.8580 f1_macro 0.6790 | val loss 1.4259 acc 0.4808 f1_macro 0.4804 kappa 0.3419
+
+Epoch 11: val_f1_macro did not improve from 0.49714
+303/303 - 43s - 141ms/step - f1_macro: 0.6790 - loss: 0.8580 - val_loss: 1.4259 - val_accuracy: 0.4808 - val_f1_macro: 0.4804 - val_kappa: 0.3419
+Epoch 12/100
+  epoch  12 | train loss 0.8023 f1_macro 0.6941 | val loss 1.5009 acc 0.4787 f1_macro 0.4831 kappa 0.3387
+
+Epoch 12: val_f1_macro did not improve from 0.49714
+303/303 - 43s - 141ms/step - f1_macro: 0.6941 - loss: 0.8023 - val_loss: 1.5009 - val_accuracy: 0.4787 - val_f1_macro: 0.4831 - val_kappa: 0.3387
+Epoch 13/100
+  epoch  13 | train loss 0.7343 f1_macro 0.7275 | val loss 1.5558 acc 0.4808 f1_macro 0.4789 kappa 0.3366
+
+Epoch 13: val_f1_macro did not improve from 0.49714
+303/303 - 43s - 141ms/step - f1_macro: 0.7275 - loss: 0.7343 - val_loss: 1.5558 - val_accuracy: 0.4808 - val_f1_macro: 0.4789 - val_kappa: 0.3366
+Epoch 14/100
+  epoch  14 | train loss 0.6755 f1_macro 0.7483 | val loss 1.6481 acc 0.4729 f1_macro 0.4753 kappa 0.3307
+
+Epoch 14: val_f1_macro did not improve from 0.49714
+303/303 - 43s - 141ms/step - f1_macro: 0.7483 - loss: 0.6755 - val_loss: 1.6481 - val_accuracy: 0.4729 - val_f1_macro: 0.4753 - val_kappa: 0.3307
+Epoch 15/100
+  epoch  15 | train loss 0.6274 f1_macro 0.7669 | val loss 1.7207 acc 0.4659 f1_macro 0.4588 kappa 0.3217
+
+Epoch 15: val_f1_macro did not improve from 0.49714
+303/303 - 43s - 140ms/step - f1_macro: 0.7669 - loss: 0.6274 - val_loss: 1.7207 - val_accuracy: 0.4659 - val_f1_macro: 0.4588 - val_kappa: 0.3217
+Epoch 16/100
+  epoch  16 | train loss 0.5576 f1_macro 0.7908 | val loss 1.7603 acc 0.4659 f1_macro 0.4716 kappa 0.3225
+
+Epoch 16: val_f1_macro did not improve from 0.49714
+303/303 - 82s - 271ms/step - f1_macro: 0.7908 - loss: 0.5576 - val_loss: 1.7603 - val_accuracy: 0.4659 - val_f1_macro: 0.4716 - val_kappa: 0.3225
+Epoch 17/100
+  epoch  17 | train loss 0.5267 f1_macro 0.8030 | val loss 1.7844 acc 0.4613 f1_macro 0.4633 kappa 0.3151
+
+Epoch 17: val_f1_macro did not improve from 0.49714
+303/303 - 42s - 140ms/step - f1_macro: 0.8030 - loss: 0.5267 - val_loss: 1.7844 - val_accuracy: 0.4613 - val_f1_macro: 0.4633 - val_kappa: 0.3151
+Epoch 17: early stopping
+Restoring model weights from the end of the best epoch: 7.
+
+================ VALIDATION (best saved epoch) ================
+f1_score macro 0.4971442939731945
+cohen_kappa_score 0.3517963116447651
+accuracy_score 0.48449772633319554
+Average of Metrics :  0.44447944398371836
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[110  34  25  23  12  20]
+ [ 35 200 109  18   7  76]
+ [ 16 136 368   8  37  83]
+ [ 38  22   7  84   6   9]
+ [ 22  16  44   7 153  18]
+ [ 17 154 209  16  23 257]]
+
+================ TEST ================
+f1_score macro 0.49164255017570363
+cohen_kappa_score 0.3486076350269346
+accuracy_score 0.4826388888888889
+Average of Metrics :  0.4409630246971757
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[107  48  32  24  13  16]
+ [ 33 203 120  28   2  92]
+ [ 22 139 396   5  42  89]
+ [ 40  23   6  92   5  12]
+ [ 29  24  44   6 160  16]
+ [ 26 145 223  13  24 293]]
+
+SETTINGS: NORM_MODE=minmax | HIDDEN=[128, 128, 96, 96, 64, 64, 64, 32, 32, 32] | DROPOUT=0.0 | BATCHNORM=True | WEIGHT_DECAY=0.0 | OPTIMIZER=adam | LR=0.001 | INIT=he_normal | CLIP=1.0 | EPOCHS=100 | EARLY_STOP=10/0.002 | SHUFFLE=True | BATCH=32 | IMAGE_SIZE=200 | JPEG_RATIO=8 | ANTIALIAS=True | VAL_FRACTION=0.2 | MONITOR=val_f1_macro | SEED=42 | CACHE=memory
+Run logged in /home/ubuntu/DL_ImageClassification/Code/experiments_Matthew.csv
