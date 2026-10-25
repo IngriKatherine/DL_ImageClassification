@@ -154,6 +154,7 @@ def test():
         final_model = tf.keras.models.load_model(mf)
 
         if k == 0:
+            os.environ['COLUMNS'] = '80'   # same summary width as an automated run (no terminal)
             # summary_<nickname>.txt written from the loaded model, as save_model() in test_to_do.py
             for d in local_dirs:
                 with open(os.path.join(d, 'summary_{}.txt'.format(NICKNAME)), 'w', encoding='utf-8', newline='\n') as fh:
