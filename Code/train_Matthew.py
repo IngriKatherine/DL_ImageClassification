@@ -13,7 +13,7 @@ from tensorflow.keras.utils import to_categorical
 #------------------------------------------------------------------------------------------------------------------
 
 '''
-Based on train_example.py (LSDR) and train_Matthew_old.py
+Based on train_example.py (LSDR) and train_Matthew.py
 10/24/2026 v2:
   - validation split carved out of the "train" rows (stratified, fixed seed); the "test" rows are never used for training
   - input normalization selectable at the top: none / scale01 / minmax [-1,1] / zscore (mean 0, std 1)
@@ -34,7 +34,7 @@ NICKNAME = 'Matthew'
 
 ## ---- Input normalization ---------------------------------------------------------------------------------------
 ##  'none'    : raw pixels 0-255, no normalization at all
-##  'scale01' : pixels divided by 255 -> range [0,1]   (what train_Matthew_old.py v1 did)
+##  'scale01' : pixels divided by 255 -> range [0,1]   (what train_Matthew.py v1 did)
 ##  'minmax'  : book option (i)   p^ = 2(p - pmin)/(pmax - pmin) - 1   element by element  -> range [-1,1]
 ##  'zscore'  : book option (ii)  p^ = (p - pmean)/pstd               element by element  -> mean 0, std 1
 ##  pmin, pmax, pmean, pstd are vectors (one value per input element = per pixel per channel),
@@ -80,7 +80,7 @@ AUTOTUNE = tf.data.AUTOTUNE
 
 ## Layout:   <project>/Data/*.jpg
 ##           <project>/excel/*.xlsx
-##           <project>/Code/train_Matthew.py   <- this file
+##           <project>/Code/train_Matthew_v2.py   <- this file
 ## The project folder is the parent of the folder where this file lives (override with --path).
 ## Output files (model, summary, results) are saved next to this file.
 
@@ -187,7 +187,7 @@ def process_path(feature, target):
 
     img = tf.image.resize( img, [IMAGE_SIZE, IMAGE_SIZE])
 
-    # unit conversion 0-255 -> 0-1 so the input matches test_Matthew_old.py
+    # unit conversion 0-255 -> 0-1 so the input matches test_Matthew.py
     # (NORM_MODE 'none' multiplies back by 255 inside the model)
     img = img / 255.0
 

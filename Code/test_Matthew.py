@@ -19,8 +19,8 @@ importlib.invalidate_caches()
 def test():
     '''
         Usage (Exam1 section 5):
-            python3 test_Matthew_old.py --path <exam folder> --split test
-            python3 test_Matthew_old.py --path <exam folder> --split validate
+            python3 test_Matthew.py --path <exam folder> --split test
+            python3 test_Matthew.py --path <exam folder> --split validate
 
         <exam folder>/excel/*.xlsx   excel file with id, target, split
         <exam folder>/Data/          the images
@@ -30,7 +30,7 @@ def test():
         results_Matthew.xlsx         output: the rows of the chosen split + column "results"
                                      (predicted class index, 0 = class1 ... 5 = class6), same format as train_example.py
 
-        Image preparation is identical to train_Matthew_old.py / train_Matthew.py:
+        Image preparation is identical to train_Matthew.py / train_Matthew_v2.py:
             decode -> resize to IMAGE_SIZE x IMAGE_SIZE -> /255 -> flatten
         IMAGE_SIZE is read from the model itself, so it can never mismatch the training.
         Any input normalization (minmax / zscore) is a layer inside the model.
