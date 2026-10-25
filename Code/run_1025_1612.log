@@ -1,0 +1,159 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1792944735.996152   71944 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+I0000 00:00:1792944740.490411   71944 gpu_device.cc:2043] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 20795 MB memory:  -> device: 0, name: NVIDIA A10G, pci bus id: 0000:00:1e.0, compute capability: 8.6
+SETTINGS: NORM_MODE=zscore | HIDDEN=[300, 200, 100, 100, 80, 50] | DROPOUT=0.0 | BATCHNORM=False | WEIGHT_DECAY=0.0 | OPTIMIZER=adam | LR=0.0001 | EPOCHS=100 | EARLY_STOP=10/0.002 | BATCH=32 | IMAGE_SIZE=200 | VAL_FRACTION=0.2 | MONITOR=val_f1_macro | SEED=42
+Training images: 9674   Validation images: 2419
+Computing normalization statistics on the training images ...
+  images used: 9674   pixel range [0.000, 1.000]   mean of pmean 0.503   mean of pstd 0.181
+Epoch 1/100
+I0000 00:00:1792944866.700366   72002 service.cc:153] XLA service 0x7bb15c0354d0 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+I0000 00:00:1792944866.700393   72002 service.cc:161]   StreamExecutor [0]: NVIDIA A10G, Compute Capability 8.6 (Driver: 13.2.0; Runtime: 12.9.0; Toolkit: 12.5.0; DNN: 9.24.0)
+I0000 00:00:1792944866.767424   72002 dump_mlir_util.cc:269] disabling MLIR crash reproducer, set env var `MLIR_CRASH_REPRODUCER_DIRECTORY` to enable.
+I0000 00:00:1792944867.128746   72002 cuda_dnn.cc:461] Loaded cuDNN version 92400
+I0000 00:00:1792944867.146371   72002 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_3141__.21
+I0000 00:00:1792944867.194537   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944868.837693   72206 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_46', 4 bytes spill stores, 4 bytes spill loads
+
+I0000 00:00:1792944868.906378   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944871.881063   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944873.154549   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944874.527483   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944876.371957   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944877.913287   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944879.100485   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944880.686562   72208 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_1_14', 128 bytes spill stores, 128 bytes spill loads
+
+I0000 00:00:1792944880.758957   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944882.370804   72208 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_1_22', 12 bytes spill stores, 12 bytes spill loads
+
+I0000 00:00:1792944882.383421   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944884.008648   72002 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792944884.786730   72206 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_44', 48 bytes spill stores, 48 bytes spill loads
+
+I0000 00:00:1792944887.987737   72002 device_compiler.h:208] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.
+I0000 00:00:1792945006.925609   72004 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_3141__.21
+I0000 00:00:1792945009.527546   72004 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792945010.831608   72004 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792945012.369347   72004 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792945013.869054   72004 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792945048.483264   72005 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792945051.611028   72005 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1792945052.783372   72005 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+  epoch   1 | train loss 1.5829 acc 0.3605 | val loss 1.5076 acc 0.3960 f1_macro 0.3828 kappa 0.2379
+
+Epoch 1: val_f1_macro improved from None to 0.38278, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 1: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 194s - 641ms/step - accuracy: 0.3605 - loss: 1.5829 - val_loss: 1.5076 - val_accuracy: 0.3960 - val_f1_macro: 0.3828 - val_kappa: 0.2379
+Epoch 2/100
+  epoch   2 | train loss 1.3427 acc 0.4503 | val loss 1.4305 acc 0.4233 f1_macro 0.4137 kappa 0.2714
+
+Epoch 2: val_f1_macro improved from 0.38278 to 0.41366, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 2: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 156s - 514ms/step - accuracy: 0.4503 - loss: 1.3427 - val_loss: 1.4305 - val_accuracy: 0.4233 - val_f1_macro: 0.4137 - val_kappa: 0.2714
+Epoch 3/100
+  epoch   3 | train loss 1.1540 acc 0.5440 | val loss 1.4219 acc 0.4423 f1_macro 0.4421 kappa 0.2960
+
+Epoch 3: val_f1_macro improved from 0.41366 to 0.44205, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 3: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 156s - 514ms/step - accuracy: 0.5440 - loss: 1.1540 - val_loss: 1.4219 - val_accuracy: 0.4423 - val_f1_macro: 0.4421 - val_kappa: 0.2960
+Epoch 4/100
+  epoch   4 | train loss 0.9423 acc 0.6380 | val loss 1.4492 acc 0.4539 f1_macro 0.4522 kappa 0.3147
+
+Epoch 4: val_f1_macro improved from 0.44205 to 0.45224, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 4: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 156s - 514ms/step - accuracy: 0.6380 - loss: 0.9423 - val_loss: 1.4492 - val_accuracy: 0.4539 - val_f1_macro: 0.4522 - val_kappa: 0.3147
+Epoch 5/100
+  epoch   5 | train loss 0.7301 acc 0.7318 | val loss 1.5679 acc 0.4580 f1_macro 0.4600 kappa 0.3154
+
+Epoch 5: val_f1_macro improved from 0.45224 to 0.45999, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 5: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 156s - 516ms/step - accuracy: 0.7318 - loss: 0.7301 - val_loss: 1.5679 - val_accuracy: 0.4580 - val_f1_macro: 0.4600 - val_kappa: 0.3154
+Epoch 6/100
+  epoch   6 | train loss 0.5240 acc 0.8240 | val loss 1.6979 acc 0.4580 f1_macro 0.4565 kappa 0.3132
+
+Epoch 6: val_f1_macro did not improve from 0.45999
+303/303 - 151s - 497ms/step - accuracy: 0.8240 - loss: 0.5240 - val_loss: 1.6979 - val_accuracy: 0.4580 - val_f1_macro: 0.4565 - val_kappa: 0.3132
+Epoch 7/100
+  epoch   7 | train loss 0.3742 acc 0.8775 | val loss 1.8670 acc 0.4531 f1_macro 0.4494 kappa 0.3150
+
+Epoch 7: val_f1_macro did not improve from 0.45999
+303/303 - 151s - 498ms/step - accuracy: 0.8775 - loss: 0.3742 - val_loss: 1.8670 - val_accuracy: 0.4531 - val_f1_macro: 0.4494 - val_kappa: 0.3150
+Epoch 8/100
+  epoch   8 | train loss 0.2726 acc 0.9169 | val loss 2.0096 acc 0.4576 f1_macro 0.4615 kappa 0.3212
+
+Epoch 8: val_f1_macro improved from 0.45999 to 0.46148, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 8: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 155s - 512ms/step - accuracy: 0.9169 - loss: 0.2726 - val_loss: 2.0096 - val_accuracy: 0.4576 - val_f1_macro: 0.4615 - val_kappa: 0.3212
+Epoch 9/100
+  epoch   9 | train loss 0.2220 acc 0.9333 | val loss 2.2727 acc 0.4456 f1_macro 0.4449 kappa 0.3001
+
+Epoch 9: val_f1_macro did not improve from 0.46148
+303/303 - 151s - 498ms/step - accuracy: 0.9333 - loss: 0.2220 - val_loss: 2.2727 - val_accuracy: 0.4456 - val_f1_macro: 0.4449 - val_kappa: 0.3001
+Epoch 10/100
+  epoch  10 | train loss 0.1959 acc 0.9378 | val loss 2.3767 acc 0.4523 f1_macro 0.4393 kappa 0.3030
+
+Epoch 10: val_f1_macro did not improve from 0.46148
+303/303 - 150s - 497ms/step - accuracy: 0.9378 - loss: 0.1959 - val_loss: 2.3767 - val_accuracy: 0.4523 - val_f1_macro: 0.4393 - val_kappa: 0.3030
+Epoch 11/100
+  epoch  11 | train loss 0.1844 acc 0.9370 | val loss 2.5301 acc 0.4585 f1_macro 0.4418 kappa 0.3075
+
+Epoch 11: val_f1_macro did not improve from 0.46148
+303/303 - 151s - 498ms/step - accuracy: 0.9370 - loss: 0.1844 - val_loss: 2.5301 - val_accuracy: 0.4585 - val_f1_macro: 0.4418 - val_kappa: 0.3075
+Epoch 12/100
+  epoch  12 | train loss 0.1965 acc 0.9348 | val loss 2.6989 acc 0.4518 f1_macro 0.4479 kappa 0.3016
+
+Epoch 12: val_f1_macro did not improve from 0.46148
+303/303 - 150s - 496ms/step - accuracy: 0.9348 - loss: 0.1965 - val_loss: 2.6989 - val_accuracy: 0.4518 - val_f1_macro: 0.4479 - val_kappa: 0.3016
+Epoch 13/100
+  epoch  13 | train loss 0.2024 acc 0.9332 | val loss 2.8409 acc 0.4518 f1_macro 0.4451 kappa 0.3036
+
+Epoch 13: val_f1_macro did not improve from 0.46148
+303/303 - 151s - 498ms/step - accuracy: 0.9332 - loss: 0.2024 - val_loss: 2.8409 - val_accuracy: 0.4518 - val_f1_macro: 0.4451 - val_kappa: 0.3036
+Epoch 14/100
+  epoch  14 | train loss 0.1521 acc 0.9520 | val loss 2.9757 acc 0.4456 f1_macro 0.4343 kappa 0.2927
+
+Epoch 14: val_f1_macro did not improve from 0.46148
+303/303 - 151s - 497ms/step - accuracy: 0.9520 - loss: 0.1521 - val_loss: 2.9757 - val_accuracy: 0.4456 - val_f1_macro: 0.4343 - val_kappa: 0.2927
+Epoch 15/100
+  epoch  15 | train loss 0.1210 acc 0.9608 | val loss 3.0436 acc 0.4461 f1_macro 0.4438 kappa 0.3011
+
+Epoch 15: val_f1_macro did not improve from 0.46148
+303/303 - 151s - 499ms/step - accuracy: 0.9608 - loss: 0.1210 - val_loss: 3.0436 - val_accuracy: 0.4461 - val_f1_macro: 0.4438 - val_kappa: 0.3011
+Epoch 15: early stopping
+Restoring model weights from the end of the best epoch: 5.
+
+================ VALIDATION (best saved epoch) ================
+f1_score macro 0.46148313670513685
+cohen_kappa_score 0.32124457713698495
+accuracy_score 0.4576271186440678
+Average of Metrics :  0.4134516108287299
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[ 87  30  25  42  20  20]
+ [ 25 171  92  39  14 104]
+ [ 10 115 307  17  57 142]
+ [ 25  18   6 105   3   9]
+ [ 13  14  41  14 147  31]
+ [ 20 108 164  53  41 290]]
+
+================ TEST ================
+f1_score macro 0.43515655306750695
+cohen_kappa_score 0.3081235414909501
+accuracy_score 0.4471450617283951
+Average of Metrics :  0.39680838542895075
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[ 64  35  29  72  17  23]
+ [ 28 185 114  38  19  94]
+ [ 20 108 341  25  55 144]
+ [ 26  21  10 103  10   8]
+ [ 20  24  42  17 158  18]
+ [ 17 122 188  36  53 308]]
+
+SETTINGS: NORM_MODE=zscore | HIDDEN=[300, 200, 100, 100, 80, 50] | DROPOUT=0.0 | BATCHNORM=False | WEIGHT_DECAY=0.0 | OPTIMIZER=adam | LR=0.0001 | EPOCHS=100 | EARLY_STOP=10/0.002 | BATCH=32 | IMAGE_SIZE=200 | VAL_FRACTION=0.2 | MONITOR=val_f1_macro | SEED=42
+Run logged in /home/ubuntu/DL_ImageClassification/Code/experiments_Matthew.csv
