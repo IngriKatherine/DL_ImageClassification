@@ -14,6 +14,12 @@ from tensorflow.keras.utils import to_categorical
 
 '''
 Based on train_example.py (LSDR) and train_Matthew.py
+10/26/2026: geometric DATA AUGMENTATION of the training images only (random horizontal/vertical flip, rotation, zoom
+            and shift, combined into one affine transform per image, reflect fill, a new transformation every epoch).
+            Applied after the RAM cache, so every epoch sees different versions of the same images. The normalization
+            statistics, the validation, the test and test_Matthew.py stay on the original images (nothing to change
+            at test time). Training metric: categorical cross-entropy instead of macro F1 (targets are one-hot).
+            The run log (experiments_Matthew.csv) records the augmentation settings.
 10/25/2026 review: antialiased resize + fast JPEG decode (recorded in the model name for the test script),
                    no Dense bias before BatchNorm, NaN epochs never saved as "best", sudo-free checks,
                    automatic RAM cache (g5.xlarge), summary file written once after training, best model loaded once
@@ -135,6 +141,29 @@ JPEG_DECODE_RATIO = 8
 ## area average 3.9 (no antialias) vs 1.2 (antialias), on the 0-255 scale.
 ANTIALIAS = True
 
+## ---- Data augmentation (geometric, TRAINING images only) -------------------------------------------------------
+## Every training image gets a random transformation each time it is used, so the network never sees exactly the same
+## image twice. An MLP has one weight per pixel and no built-in invariance to position or orientation: augmentation
+## teaches it that a leaf flipped, turned, shifted or seen a little closer is still the same class, and it works as a
+## regularizer (last run without it: train macro F1 0.80 vs validation 0.46 at epoch 17 -> heavy overfitting).
+## The leaves are photographed at any angle, so left/right AND up/down flips keep the label.
+## Flips, rotation, zoom and shift are combined into ONE affine transform -> each image is interpolated only once.
+## Validation, test and test_Matthew.py use the original images (no augmentation at test time, nothing to change there).
+AUGMENT = True           # master switch: False = original images only (as before)
+AUG_FLIP_H = True        # random left-right flip (probability 0.5)
+AUG_FLIP_V = True        # random up-down flip (probability 0.5)
+AUG_ROTATION = 20.0      # max rotation in degrees, uniform in [-AUG_ROTATION, +AUG_ROTATION]      (0 = off)
+AUG_ZOOM = 0.10          # max zoom, scale uniform in [1-AUG_ZOOM, 1+AUG_ZOOM]; >1 = closer          (0 = off)
+AUG_SHIFT = 0.10         # max shift as a fraction of the image side, horizontal and vertical          (0 = off)
+## pixels that come from outside the picture (corners after a rotation, borders after a shift or zoom-out):
+##  'reflect'  : mirror of the image (leaf/foliage texture, no artificial black corners for the MLP to learn)
+##  'nearest'  : repeat the closest edge pixel
+##  'constant' : black (0)
+AUG_FILL_MODE = 'reflect'
+## save augmentation_preview_<NICKNAME>.png before training (rows: 4 training images, columns: original + 5 random
+## versions) to check by eye that the transformations keep the leaf and its spots visible
+AUG_PREVIEW = True
+
 #==================================================================================================================
 
 ## Process images in parallel
@@ -179,6 +208,14 @@ def check_settings():
     if 2672 // JPEG_DECODE_RATIO < IMAGE_SIZE:
         print('WARNING: 2672/JPEG_DECODE_RATIO = {} is smaller than IMAGE_SIZE = {}: images would be enlarged, '
               'use a smaller JPEG_DECODE_RATIO'.format(2672 // JPEG_DECODE_RATIO, IMAGE_SIZE))
+    if AUG_FILL_MODE not in ('reflect', 'nearest', 'constant'):
+        raise ValueError("AUG_FILL_MODE must be 'reflect', 'nearest' or 'constant', got {}".format(AUG_FILL_MODE))
+    if not 0.0 <= AUG_ROTATION <= 180.0:
+        raise ValueError('AUG_ROTATION must be in [0, 180] degrees')
+    if not 0.0 <= AUG_ZOOM < 1.0:
+        raise ValueError('AUG_ZOOM must be in [0, 1)')
+    if not 0.0 <= AUG_SHIFT <= 0.5:
+        raise ValueError('AUG_SHIFT must be in [0, 0.5]')
 #------------------------------------------------------------------------------------------------------------------
 
 def resolve_cache_mode(n_images):
@@ -349,6 +386,105 @@ def read_data(df, num_classes, cache=None, shuffle=False):
     return final_ds
 #------------------------------------------------------------------------------------------------------------------
 
+def augment_batch(x, seed):
+    '''
+        random geometric transformation of a batch of flat images (training only)
+        x    : [batch, IMAGE_SIZE*IMAGE_SIZE*CHANNELS] pixels in [0,1], as produced by process_path
+        seed : 2 integers. Stateless random numbers: the same seed always gives the same transformations
+
+        every image gets its own flips, rotation theta, zoom s and shift t. The image content is moved as
+              p = c + s * R(theta) * F * (q - c) + t        (q = input pixel, p = output pixel, c = image center)
+        ImageProjectiveTransformV3 needs the opposite direction (for every output pixel, where to read it from):
+              q = A (p - c - t) + c ,   A = F * R(-theta) / s
+        and samples the input there with bilinear interpolation (one interpolation for all the transformations).
+    '''
+    size = IMAGE_SIZE
+    b = tf.shape(x)[0]
+    img = tf.reshape(x, [b, size, size, CHANNELS])
+
+    u = tf.random.stateless_uniform([b, 6], seed=seed)      # 6 independent numbers in [0,1) for every image
+
+    ones = tf.ones_like(u[:, 0])
+    fx = tf.where(u[:, 0] < 0.5, -1.0, 1.0) if AUG_FLIP_H else ones     # -1 = left-right flip
+    fy = tf.where(u[:, 1] < 0.5, -1.0, 1.0) if AUG_FLIP_V else ones     # -1 = up-down flip
+    theta = (2.0 * u[:, 2] - 1.0) * (AUG_ROTATION * np.pi / 180.0)      # radians
+    s = 1.0 + (2.0 * u[:, 3] - 1.0) * AUG_ZOOM                          # scale, > 1 = zoom in
+    tx = (2.0 * u[:, 4] - 1.0) * (AUG_SHIFT * size)                     # shift in pixels (columns)
+    ty = (2.0 * u[:, 5] - 1.0) * (AUG_SHIFT * size)                     # shift in pixels (rows)
+
+    c = (size - 1) / 2.0
+    cos, sin = tf.cos(theta), tf.sin(theta)
+    a00, a01 = fx * cos / s, fx * sin / s
+    a10, a11 = -fy * sin / s, fy * cos / s
+    b0 = c - a00 * (c + tx) - a01 * (c + ty)
+    b1 = c - a10 * (c + tx) - a11 * (c + ty)
+    zeros = tf.zeros_like(a00)
+    # one row per image: [a0, a1, a2, b0, b1, b2, c0, c1]  (c0 = c1 = 0: affine, no perspective)
+    transforms = tf.stack([a00, a01, b0, a10, a11, b1, zeros, zeros], axis=1)
+
+    out = tf.raw_ops.ImageProjectiveTransformV3(images=img, transforms=transforms,
+                                                output_shape=tf.constant([size, size], tf.int32),
+                                                fill_value=tf.constant(0.0, tf.float32),
+                                                interpolation='BILINEAR', fill_mode=AUG_FILL_MODE.upper())
+
+    return tf.reshape(out, [b, size * size * CHANNELS])
+#------------------------------------------------------------------------------------------------------------------
+
+def augment_dataset(ds):
+    '''
+        adds the random augmentation to the (already shuffled and batched) training pipeline from read_data.
+        It comes AFTER the RAM cache, so the cache keeps the original images and each epoch draws new transformations.
+        ds itself is not changed: it keeps giving the original images (used for the normalization statistics),
+        and both share the same cache (the images are decoded only once).
+
+        Random numbers: one seed per batch from tf.data.Dataset.random(SEED) -> repeatable runs, and
+        rerandomize_each_iteration=True gives a different sequence at every epoch.
+    '''
+    try:
+        seeds = tf.data.Dataset.random(seed=SEED, rerandomize_each_iteration=True)
+    except TypeError:
+        # older TensorFlow: same seed sequence every epoch, but the batches are reshuffled, so each image still gets a
+        # different transformation every epoch
+        seeds = tf.data.Dataset.random(seed=SEED)
+
+    def augment(xy, r):
+        x, y = xy
+        return augment_batch(x, tf.stack([r, tf.constant(SEED, tf.int64)])), y
+
+    return tf.data.Dataset.zip((ds, seeds)).map(augment, num_parallel_calls=AUTOTUNE).prefetch(AUTOTUNE)
+#------------------------------------------------------------------------------------------------------------------
+
+def augmentation_text():
+    if not AUGMENT:
+        return 'off'
+    parts = (['flipH'] if AUG_FLIP_H else []) + (['flipV'] if AUG_FLIP_V else [])
+    parts += ['rot{:g}'.format(AUG_ROTATION), 'zoom{:g}'.format(AUG_ZOOM), 'shift{:g}'.format(AUG_SHIFT), AUG_FILL_MODE]
+    return ' '.join(parts)
+#------------------------------------------------------------------------------------------------------------------
+
+def save_augmentation_preview(df, n_images=4, n_versions=5):
+    '''
+        writes augmentation_preview_<NICKNAME>.png: one row per training image, first column the original,
+        then n_versions random augmented versions. Only n_images files are decoded (the cache is not touched).
+    '''
+    files = (DATA_DIR + df['id'].iloc[:n_images]).tolist()
+    clean = tf.stack([process_path(tf.constant(f), 0)[0] for f in files])
+
+    columns = [clean] + [augment_batch(clean, tf.constant([k + 1, SEED], tf.int64)) for k in range(n_versions)]
+
+    def column_image(flat):
+        imgs = tf.reshape(flat, [-1, IMAGE_SIZE, IMAGE_SIZE, CHANNELS])
+        imgs = tf.pad(imgs, [[0, 0], [3, 3], [3, 3], [0, 0]], constant_values=1.0)   # white frame
+        return tf.concat(tf.unstack(imgs), axis=0)                                   # images stacked vertically
+
+    grid = tf.concat([column_image(col) for col in columns], axis=1)
+    png = tf.io.encode_png(tf.cast(tf.round(tf.clip_by_value(grid, 0.0, 1.0) * 255.0), tf.uint8))
+
+    file_name = out_file('augmentation_preview_{}.png'.format(NICKNAME))
+    tf.io.write_file(file_name, png)
+    print('Augmentation preview saved to', file_name)
+#------------------------------------------------------------------------------------------------------------------
+
 def compute_input_stats(ds):
     '''
         one pass over the TRAINING images to get, for every input element (pixel x channel):
@@ -487,11 +623,13 @@ def model_definition(stats):
     # 3) output layer, OUTPUTS_a is the number of targets
     model.add(tf.keras.layers.Dense(OUTPUTS_a, activation='softmax', kernel_regularizer=reg))
 
-    # metric shown during training: macro F1 (each class counts the same, as in the leaderboard metrics) instead of
-    # accuracy, which looks good just by favouring the large classes. Metrics are only reported, the weights are
-    # trained on the loss (cross-entropy).
+    # metric shown during training: categorical cross-entropy (one-hot targets, softmax output, 6 classes).
+    # Metrics are only reported, the weights are trained on the loss. With WEIGHT_DECAY = 0 it equals the loss;
+    # with WEIGHT_DECAY > 0 the loss also includes the L2 penalty and this metric shows the cross-entropy alone.
+    # With AUGMENT on, the training values are measured on the augmented images. Macro F1, kappa and accuracy
+    # are still computed on the validation images every epoch (ValidationMetrics) and pick the saved epoch.
     model.compile(optimizer=make_optimizer(), loss='categorical_crossentropy',
-                  metrics=[tf.keras.metrics.F1Score(average='macro', name='f1_macro')])
+                  metrics=[tf.keras.metrics.CategoricalCrossentropy(name='categorical_ce')])
 
     # shown on screen only; summary_<NICKNAME>.txt is written once after training, from the saved model
     model.summary()
@@ -527,8 +665,8 @@ class ValidationMetrics(tf.keras.callbacks.Callback):
         logs['val_f1_macro'] = float(f1_score(self.y_val, pred, average='macro'))
         logs['val_kappa'] = float(cohen_kappa_score(self.y_val, pred))
 
-        print('  epoch {:3d} | train loss {:.4f} f1_macro {:.4f} | val loss {:.4f} acc {:.4f} f1_macro {:.4f} kappa {:.4f}'.format(
-            epoch + 1, logs.get('loss', np.nan), logs.get('f1_macro', np.nan),
+        print('  epoch {:3d} | train loss {:.4f} cat_ce {:.4f} | val loss {:.4f} acc {:.4f} f1_macro {:.4f} kappa {:.4f}'.format(
+            epoch + 1, logs.get('loss', np.nan), logs.get('categorical_ce', np.nan),
             logs['val_loss'], logs['val_accuracy'], logs['val_f1_macro'], logs['val_kappa']))
 #------------------------------------------------------------------------------------------------------------------
 
@@ -689,10 +827,10 @@ def dropout_used():
 def settings_text():
     return ('NORM_MODE={} | HIDDEN={} | DROPOUT={} | BATCHNORM={} | WEIGHT_DECAY={} | OPTIMIZER={} | LR={} | '
             'INIT={} | CLIP={} | EPOCHS={} | EARLY_STOP={}/{} | SHUFFLE={} | BATCH={} | IMAGE_SIZE={} | '
-            'JPEG_RATIO={} | ANTIALIAS={} | VAL_FRACTION={} | MONITOR={} | SEED={}').format(
+            'JPEG_RATIO={} | ANTIALIAS={} | AUGMENT={} | VAL_FRACTION={} | MONITOR={} | SEED={}').format(
         NORM_MODE, HIDDEN_LAYERS, dropout_used(), USE_BATCHNORM, WEIGHT_DECAY, OPTIMIZER, LEARNING_RATE, KERNEL_INIT, CLIP_NORM, n_epoch,
         EARLY_STOP_PATIENCE, EARLY_STOP_MIN_DELTA, SHUFFLE_EACH_EPOCH, BATCH_SIZE, IMAGE_SIZE,
-        JPEG_DECODE_RATIO, ANTIALIAS, VAL_FRACTION, CHECKPOINT_MONITOR, SEED)
+        JPEG_DECODE_RATIO, ANTIALIAS, augmentation_text(), VAL_FRACTION, CHECKPOINT_MONITOR, SEED)
 #------------------------------------------------------------------------------------------------------------------
 
 def log_experiment(history, val_values, test_values):
@@ -710,7 +848,8 @@ def log_experiment(history, val_values, test_values):
            'batchnorm': USE_BATCHNORM, 'weight_decay': WEIGHT_DECAY,
            'optimizer': OPTIMIZER, 'lr': LEARNING_RATE, 'init': KERNEL_INIT, 'clip': CLIP_NORM, 'shuffle': SHUFFLE_EACH_EPOCH, 'patience': EARLY_STOP_PATIENCE,
            'epochs_run': len(history.history.get('loss', [])), 'best_epoch': best_epoch,
-           'batch': BATCH_SIZE, 'image_size': IMAGE_SIZE, 'jpeg_ratio': JPEG_DECODE_RATIO, 'antialias': ANTIALIAS, 'monitor': CHECKPOINT_MONITOR, 'seed': SEED,
+           'batch': BATCH_SIZE, 'image_size': IMAGE_SIZE, 'jpeg_ratio': JPEG_DECODE_RATIO, 'antialias': ANTIALIAS,
+           'augment': augmentation_text(), 'monitor': CHECKPOINT_MONITOR, 'seed': SEED,
            'val_f1_macro': val_values.get('f1_macro'), 'val_kappa': val_values.get('coh'),
            'val_acc': val_values.get('acc'),
            'test_f1_macro': test_values.get('f1_macro'), 'test_kappa': test_values.get('coh'),
@@ -718,6 +857,16 @@ def log_experiment(history, val_values, test_values):
 
     file_name = out_file('experiments_{}.csv'.format(NICKNAME))
     new_file = not os.path.exists(file_name)
+
+    if not new_file:
+        # a file written by an older version of this script has other columns: rewrite it with all the columns
+        # (old runs get an empty cell in the new ones) so the rows never shift under the wrong header
+        old = pd.read_csv(file_name)
+        if list(old.columns) != list(row.keys()):
+            pd.concat([old, pd.DataFrame([row])], ignore_index=True).to_csv(file_name, index=False)
+            print('Run logged in', file_name, '(columns updated)')
+            return
+
     with open(file_name, 'a', newline='') as fh:
         writer = csv.DictWriter(fh, fieldnames=list(row.keys()))
         if new_file:
@@ -766,14 +915,23 @@ def main():
     print('Training images: {}   Validation images: {}'.format(len(xdf_tr), len(xdf_val)))
 
     cache = resolve_cache_mode(len(xdf_tr) + len(xdf_val))
-    train_ds = read_data(xdf_tr, OUTPUTS_a, cache=cache, shuffle=SHUFFLE_EACH_EPOCH)
+    train_clean_ds = read_data(xdf_tr, OUTPUTS_a, cache=cache, shuffle=SHUFFLE_EACH_EPOCH)   # original images
     val_ds = read_data(xdf_val, OUTPUTS_a, cache=cache)
     y_val = xdf_val['target'].map(class_to_idx).to_numpy()
 
-    ## Normalization statistics from the training part only
+    ## Data augmentation: training images only, added after the cache (validation and test stay original)
+    if AUGMENT:
+        train_ds = augment_dataset(train_clean_ds)
+        if AUG_PREVIEW:
+            save_augmentation_preview(xdf_tr)
+    else:
+        train_ds = train_clean_ds
+
+    ## Normalization statistics from the training part only, on the ORIGINAL images (the test images are not
+    ## augmented, so the input layer must be centred and scaled for them). This pass also fills the RAM cache.
     stats = None
     if NORM_MODE in ('minmax', 'zscore'):
-        stats = compute_input_stats(train_ds)
+        stats = compute_input_stats(train_clean_ds)
 
     # best_model = the best saved epoch, loaded once from model_<NICKNAME>.keras for validation and test
     history, best_model = train_func(train_ds, val_ds, y_val, stats)
