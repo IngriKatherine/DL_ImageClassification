@@ -14,6 +14,22 @@ from tensorflow.keras.utils import to_categorical
 
 '''
 Based on train_example.py (LSDR) and train_Matthew.py
+10/26/2026 pm: generalization (book NND2 Ch.13 "Methods for Improving Generalization", Early Stopping, Fig. 13.4)
+            - EARLY STOPPING as in the book: the validation error F (the same cross-entropy the network is trained on)
+              decides when to stop AND which weights are kept. Point "a" = epoch with the minimum validation error;
+              training stops when F_val has not gone below it for EARLY_STOP_PATIENCE epochs (point "b") and the
+              weights of point "a" are saved. Before, val macro F1 with patience 10 stopped the run by chance at
+              epoch 32 while F_val was still going down (no point "a" reached).
+              Every epoch the training error F is also measured on the ORIGINAL training images in inference mode,
+              so the two curves of Fig. 13.4 are comparable. early_stopping_<NICKNAME>.png reproduces Fig. 13.4
+              (log-log, a and b marked) and early_stopping_<NICKNAME>.csv keeps the numbers of every epoch.
+            - LEARNING-RATE SCHEDULE: alpha is halved when F_val stops improving (book: "use a relatively slow
+              training method", so the training does not jump past point "a")
+            - CLASS WEIGHTS: each training image of class c weighs N/(K*n_c) in the loss (balanced), so the small
+              classes count as much as the big ones in the gradient (macro F1)
+            - TEST-TIME AUGMENTATION: final prediction = average of the softmax over the original image and its
+              flipped versions (left-right, up-down, both). The flips used in training are written into the model
+              name (e.g. MLP_Matthew_flip_hv_prep_r8_aa) and test_Matthew.py reads them back
 10/26/2026: geometric DATA AUGMENTATION of the training images only (random horizontal/vertical flip, rotation, zoom
             and shift, combined into one affine transform per image, reflect fill, a new transformation every epoch).
             Applied after the RAM cache, so every epoch sees different versions of the same images. The normalization
@@ -105,16 +121,60 @@ SEED = 42                # same seed -> same validation split and same initial w
 ## Validation and test are never shuffled (their predictions must stay aligned with the Excel rows).
 SHUFFLE_EACH_EPOCH = True
 
-## Which validation number decides the "best" epoch saved to model_<NICKNAME>.keras
-##  'val_f1_macro' | 'val_kappa' | 'val_accuracy' | 'val_loss'
-CHECKPOINT_MONITOR = 'val_f1_macro'
+## ---- Early stopping (book NND2 Ch.13 "Early Stopping", Fig. 13.4) --------------------------------------------
+## The "train" rows are divided into a training set (used for the gradients) and a validation set (only monitored).
+## After every epoch the validation error F_val is computed. Point "a" = the epoch with the smallest F_val.
+## When F_val has not gone below that minimum for EARLY_STOP_PATIENCE epochs in a row, training stops (point "b")
+## and the weights of point "a" are the final weights (saved to model_<NICKNAME>.keras).
+## F = the performance index the network is trained on: cross-entropy, class-weighted when CLASS_WEIGHTS is on.
+## F_val goes up and down from epoch to epoch. Book Ch.25 case study: "the validation error curve does not always fall
+## at each iteration, and it may rise before falling to a lower value" (they waited 40 iterations) -> long patience.
+##  EARLY_STOP_MONITOR: 'val_loss' (book: validation error F) | 'val_f1_macro' | 'val_kappa' | 'val_accuracy'
+EARLY_STOP_MONITOR = 'val_loss'
+EARLY_STOP_PATIENCE = 25     # epochs without a new minimum before stopping (0 = off: runs all n_epoch epochs)
+EARLY_STOP_MIN_DELTA = 0.0   # book: any decrease of F_val is a new minimum
 
-## ---- Early stopping ------------------------------------------------------------------------------------------
-## After every epoch the monitored validation value (CHECKPOINT_MONITOR) is checked. If it has not improved by at
-## least EARLY_STOP_MIN_DELTA for EARLY_STOP_PATIENCE epochs in a row, training stops. The weights of the best
-## epoch are the ones saved in model_<NICKNAME>.keras (and restored in memory).
-EARLY_STOP_PATIENCE = 10     # 0 = off
-EARLY_STOP_MIN_DELTA = 0.002 # smaller changes do not count as an improvement (F1 / kappa / accuracy units)
+## Which validation value picks the weights saved to model_<NICKNAME>.keras
+##  'val_loss' (book: point "a", minimum validation error) | 'val_f1_macro' | 'val_kappa' | 'val_accuracy'
+## Middle ground: EARLY_STOP_MONITOR = 'val_loss' (when to stop) + CHECKPOINT_MONITOR = 'val_f1_macro' (which weights)
+CHECKPOINT_MONITOR = 'val_loss'
+
+## Training curve of Fig. 13.4: after every epoch F is also computed on the ORIGINAL training images in inference mode
+## (no augmentation, BatchNorm with its moving averages, exactly like the validation images). The loss Keras prints is
+## measured on the augmented images while the weights are changing (BatchNorm in training mode), so it cannot be
+## compared with F_val. Costs one extra pass over the cached training images per epoch. Needs the RAM cache.
+TRAIN_CURVE = True
+
+## ---- Learning-rate schedule ----------------------------------------------------------------------------------
+## Book: "we should use a relatively slow training method ... If the training method is too fast, it will likely jump
+## past the point at which the validation error is minimized." Big steps at the start, smaller steps near point "a":
+##  'plateau' : alpha = alpha * LR_FACTOR when the monitored value (EARLY_STOP_MONITOR) has not improved for
+##              LR_PATIENCE epochs, never below LR_MIN
+##  'none'    : alpha = LEARNING_RATE for the whole run (as before)
+## Keep LR_PATIENCE well below EARLY_STOP_PATIENCE, so alpha is lowered a few times before the training is stopped.
+LR_SCHEDULE = 'plateau'
+LR_FACTOR = 0.5
+LR_PATIENCE = 4
+LR_MIN = 1e-5
+
+## ---- Class weights -------------------------------------------------------------------------------------------
+## The classes are unbalanced (validation: 676 class6 and 648 class3 images vs 166 class4 and 224 class1), so with the
+## plain loss the big classes dominate the gradient. With class weights, the loss of every training image of class c
+## is multiplied by w_c (computed on the training part only):
+##  'balanced' : w_c = N / (K * n_c)   (N images, K classes, n_c images of class c) -> every class has the same total
+##               weight; the average weight over the training images is exactly 1
+##  'sqrt'     : square root of the balanced weights, rescaled to an average of 1 (softer)
+##  'none'     : every image weighs 1 (as before)
+## The validation error F_val and the training curve use the same weights, so F is the same function everywhere.
+CLASS_WEIGHTS = 'balanced'
+
+## ---- Test-time augmentation (TTA) ------------------------------------------------------------------------------
+## The prediction of an image = average of the softmax outputs for the original image and its flipped versions
+## (left-right, up-down, both = 180 degree rotation): 4 views. Only the flips the network saw in training (AUG_FLIP_H,
+## AUG_FLIP_V with AUGMENT on) are used. They are written into the model name (e.g. MLP_Matthew_flip_hv_prep_r8_aa),
+## so test_Matthew.py uses the same views. TTA is used for the final validation/test numbers and results_<NICKNAME>.xlsx
+## (both are printed, with and without TTA); the epoch-by-epoch validation (early stopping) uses the original images.
+TTA = True
 
 ## ---- Speed -----------------------------------------------------------------------------------------------------
 ## Decoding the 4000x2672 JPGs is the slowest part of training (the g5.xlarge has only 4 vCPUs for it; the GPU waits).
@@ -148,7 +208,7 @@ ANTIALIAS = True
 ## regularizer (last run without it: train macro F1 0.80 vs validation 0.46 at epoch 17 -> heavy overfitting).
 ## The leaves are photographed at any angle, so left/right AND up/down flips keep the label.
 ## Flips, rotation, zoom and shift are combined into ONE affine transform -> each image is interpolated only once.
-## Validation, test and test_Matthew.py use the original images (no augmentation at test time, nothing to change there).
+## Validation, test and test_Matthew.py use the original images (only the flips come back at test time, see TTA).
 AUGMENT = True           # master switch: False = original images only (as before)
 AUG_FLIP_H = True        # random left-right flip (probability 0.5)
 AUG_FLIP_V = True        # random up-down flip (probability 0.5)
@@ -193,6 +253,16 @@ def check_settings():
         raise ValueError("NORM_MODE must be 'none', 'scale01', 'minmax' or 'zscore', got {}".format(NORM_MODE))
     if CHECKPOINT_MONITOR not in ('val_f1_macro', 'val_kappa', 'val_accuracy', 'val_loss'):
         raise ValueError('CHECKPOINT_MONITOR not recognised: {}'.format(CHECKPOINT_MONITOR))
+    if EARLY_STOP_MONITOR not in ('val_f1_macro', 'val_kappa', 'val_accuracy', 'val_loss'):
+        raise ValueError('EARLY_STOP_MONITOR not recognised: {}'.format(EARLY_STOP_MONITOR))
+    if LR_SCHEDULE not in ('plateau', 'none'):
+        raise ValueError("LR_SCHEDULE must be 'plateau' or 'none', got {}".format(LR_SCHEDULE))
+    if LR_SCHEDULE == 'plateau' and not 0.0 < LR_FACTOR < 1.0:
+        raise ValueError('LR_FACTOR must be in (0, 1)')
+    if CLASS_WEIGHTS not in ('balanced', 'sqrt', 'none'):
+        raise ValueError("CLASS_WEIGHTS must be 'balanced', 'sqrt' or 'none', got {}".format(CLASS_WEIGHTS))
+    if EARLY_STOP_PATIENCE > 0 and LR_SCHEDULE == 'plateau' and LR_PATIENCE >= EARLY_STOP_PATIENCE:
+        print('WARNING: LR_PATIENCE >= EARLY_STOP_PATIENCE, the training stops before the learning rate is lowered')
     if CACHE_MODE not in (None, 'memory', 'auto'):
         raise ValueError("CACHE_MODE must be 'auto', 'memory' or None")
     if not 0.0 <= DROPOUT_RATE < 1.0:
@@ -350,12 +420,14 @@ def get_target(df, num_classes):
     return y_target
 #------------------------------------------------------------------------------------------------------------------
 
-def read_data(df, num_classes, cache=None, shuffle=False):
+def read_data(df, num_classes, cache=None, shuffle=False, with_unshuffled=False):
     '''
           builds the tf.data pipeline for the rows in df
           only the file names are kept in memory, each image is read from disk when its batch is needed
           shuffle=False keeps the order of the rows in df (needed so predictions line up with the rows)
           shuffle=True  (training only) gives a new random order of the images at every epoch
+          with_unshuffled=True also returns the same images in the order of df, reading the SAME RAM cache
+          (no second copy, no shuffle buffer). None when there is no RAM cache.
     '''
 
     ds_inputs = (DATA_DIR + df['id']).tolist()
@@ -369,12 +441,15 @@ def read_data(df, num_classes, cache=None, shuffle=False):
     list_ds = tf.data.Dataset.from_tensor_slices((ds_inputs, ds_targets)) # creates a tensor from the image paths and targets
 
     n = len(ds_inputs)
+    unshuffled_ds = None
 
     if cache == 'memory':
         # decode once, keep in RAM, then reshuffle the cached images every epoch
-        final_ds = list_ds.map(process_path, num_parallel_calls=AUTOTUNE).cache()
+        cached_ds = list_ds.map(process_path, num_parallel_calls=AUTOTUNE).cache()
+        final_ds = cached_ds
         if shuffle:
             final_ds = final_ds.shuffle(n, seed=SEED, reshuffle_each_iteration=True)
+        unshuffled_ds = cached_ds.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     else:
         # shuffle only the file names (tiny) before the images are read
         if shuffle:
@@ -383,7 +458,106 @@ def read_data(df, num_classes, cache=None, shuffle=False):
 
     final_ds = final_ds.batch(BATCH_SIZE).prefetch(AUTOTUNE)
 
+    if with_unshuffled:
+        return final_ds, unshuffled_ds
     return final_ds
+#------------------------------------------------------------------------------------------------------------------
+
+def compute_class_weights(y_idx, num_classes):
+    '''
+        weight w_c of every class, from the class index of every TRAINING image (see CLASS_WEIGHTS)
+        balanced: w_c = N / (K * n_c)  ->  sum over the images of w = N  (average weight 1)
+    '''
+    counts = np.bincount(y_idx, minlength=num_classes).astype(np.float64)
+    n, k = counts.sum(), num_classes
+
+    if CLASS_WEIGHTS == 'none':
+        w = np.ones(k)
+    else:
+        w = n / (k * np.maximum(counts, 1.0))
+        if CLASS_WEIGHTS == 'sqrt':
+            w = np.sqrt(w)
+            w = w * n / np.sum(counts * w)      # rescaled so the average weight over the images is again 1
+
+    print('Class weights ({}):'.format(CLASS_WEIGHTS))
+    for c in range(k):
+        print('  {:10s} {:5d} training images   w = {:.3f}'.format(str(class_names[c]), int(counts[c]), w[c]))
+
+    return w.astype(np.float32)
+#------------------------------------------------------------------------------------------------------------------
+
+def add_sample_weights(ds, class_w):
+    '''
+        (x, y) -> (x, y, w): w = weight of the class of every image (y is one-hot, so w = sum(y * class_w))
+        Keras multiplies the loss of every image by its w:  F = sum_q w_q * ce_q / Q
+    '''
+    w_vec = tf.constant(class_w, tf.float32)
+    return ds.map(lambda x, y: (x, y, tf.reduce_sum(y * w_vec, axis=-1)), num_parallel_calls=AUTOTUNE)
+#------------------------------------------------------------------------------------------------------------------
+
+def weighted_ce(prob, y_idx, class_w):
+    '''
+        performance index F on a set of images: class-weighted average cross-entropy
+            F = sum_q w_q * (-log a_q[t_q]) / sum_q w_q          (w_q = 1 for all images -> plain cross-entropy)
+        returns (F, plain cross-entropy)
+    '''
+    p_true = np.clip(prob[np.arange(len(y_idx)), y_idx], 1e-7, 1.0)
+    ce = -np.log(p_true)
+    return float(np.average(ce, weights=class_w[y_idx])), float(np.mean(ce))
+#------------------------------------------------------------------------------------------------------------------
+
+def trained_flips():
+    '''
+        flips the network sees in training: '' | 'h' | 'v' | 'hv'   (h = left-right, v = up-down)
+    '''
+    if not AUGMENT:
+        return ''
+    return ('h' if AUG_FLIP_H else '') + ('v' if AUG_FLIP_V else '')
+#------------------------------------------------------------------------------------------------------------------
+
+def tta_views(flips):
+    '''
+        views used by test-time augmentation: list of (flip left-right, flip up-down), the original image first
+        'hv' -> original, left-right, up-down, both (= 180 degree rotation)
+    '''
+    views = [(False, False)]
+    if 'h' in flips:
+        views.append((True, False))
+    if 'v' in flips:
+        views.append((False, True))
+    if 'h' in flips and 'v' in flips:
+        views.append((True, True))
+    return views
+#------------------------------------------------------------------------------------------------------------------
+
+def flip_flat(x, flip_lr, flip_ud):
+    '''
+        flips a batch of flat images [batch, IMAGE_SIZE*IMAGE_SIZE*CHANNELS] (exact pixel mirror, no interpolation)
+    '''
+    axes = ([2] if flip_lr else []) + ([1] if flip_ud else [])
+    if not axes:
+        return x
+    img = tf.reshape(x, [-1, IMAGE_SIZE, IMAGE_SIZE, CHANNELS])
+    img = tf.reverse(img, axis=axes)
+    return tf.reshape(img, [-1, IMAGE_SIZE * IMAGE_SIZE * CHANNELS])
+#------------------------------------------------------------------------------------------------------------------
+
+def predict_proba(final_model, ds, tta=False):
+    '''
+        softmax output of every image in ds (ds gives (x, y) batches, in the order of the rows)
+        tta=True: average of the softmax over the TTA views (same code as test_Matthew.py)
+    '''
+    views = tta_views(trained_flips()) if tta else [(False, False)]
+    if len(views) == 1:
+        return final_model.predict(ds, verbose=0)
+
+    out = []
+    for xb, _ in ds:
+        p = 0.0
+        for flip_lr, flip_ud in views:
+            p = p + np.asarray(final_model.predict_on_batch(flip_flat(xb, flip_lr, flip_ud)))
+        out.append(p / len(views))
+    return np.concatenate(out, axis=0)
 #------------------------------------------------------------------------------------------------------------------
 
 def augment_batch(x, seed):
@@ -592,7 +766,11 @@ def make_optimizer():
 #------------------------------------------------------------------------------------------------------------------
 
 def model_name():
-    return 'MLP_{}_prep_r{}{}'.format(NICKNAME, JPEG_DECODE_RATIO, '_aa' if ANTIALIAS else '')
+    # _flip_hv: flips seen in training, test_Matthew.py uses them for test-time augmentation
+    # _prep_r8_aa: JPEG decode ratio and antialias, test_Matthew.py prepares the images the same way (kept at the end)
+    flips = trained_flips()
+    return 'MLP_{}{}_prep_r{}{}'.format(NICKNAME, '_flip_' + flips if flips else '',
+                                        JPEG_DECODE_RATIO, '_aa' if ANTIALIAS else '')
 #------------------------------------------------------------------------------------------------------------------
 
 def model_definition(stats):
@@ -626,8 +804,9 @@ def model_definition(stats):
     # metric shown during training: categorical cross-entropy (one-hot targets, softmax output, 6 classes).
     # Metrics are only reported, the weights are trained on the loss. With WEIGHT_DECAY = 0 it equals the loss;
     # with WEIGHT_DECAY > 0 the loss also includes the L2 penalty and this metric shows the cross-entropy alone.
-    # With AUGMENT on, the training values are measured on the augmented images. Macro F1, kappa and accuracy
-    # are still computed on the validation images every epoch (ValidationMetrics) and pick the saved epoch.
+    # With CLASS_WEIGHTS on, both are class-weighted. With AUGMENT on, they are measured on the augmented images.
+    # F on the original training images, F_val, macro F1, kappa and accuracy are computed every epoch by
+    # ValidationMetrics and decide the learning rate, the stop and the saved epoch.
     model.compile(optimizer=make_optimizer(), loss='categorical_crossentropy',
                   metrics=[tf.keras.metrics.CategoricalCrossentropy(name='categorical_ce')])
 
@@ -638,52 +817,96 @@ def model_definition(stats):
 
 class ValidationMetrics(tf.keras.callbacks.Callback):
     '''
-        at the end of every epoch predicts the validation images and adds to the epoch log:
-        val_loss (cross-entropy), val_accuracy, val_f1_macro, val_kappa
-        ModelCheckpoint / EarlyStopping (placed after this callback) can then monitor any of them.
+        at the end of every epoch adds to the epoch log (ReduceLROnPlateau / ModelCheckpoint / EarlyStopping, placed
+        after this callback, can then monitor any of them):
+          lr           : learning rate alpha used during this epoch
+          val_loss     : validation error F_val (cross-entropy, class-weighted when CLASS_WEIGHTS is on)
+          val_ce       : plain cross-entropy on the validation images
+          val_accuracy, val_f1_macro, val_kappa
+          train_F, train_accuracy : F and accuracy on the ORIGINAL training images, inference mode (TRAIN_CURVE)
     '''
-    def __init__(self, val_ds, y_val):
+    def __init__(self, val_ds, y_val, class_w, train_eval_ds=None):
         super().__init__()
         self.val_ds = val_ds
-        self.y_val = y_val     # integer class index of every validation image
+        self.y_val = y_val                  # integer class index of every validation image
+        self.class_w = class_w              # weight of every class
+        self.train_eval_ds = train_eval_ds  # original training images (x, one-hot y), None = no training curve
+
+    def training_error(self):
+        '''
+            F and accuracy over the original training images, with the weights at the end of this epoch
+        '''
+        f_sum = w_sum = correct = n = 0.0
+        for xb, yb in self.train_eval_ds:
+            prob = np.asarray(self.model.predict_on_batch(xb))
+            y_idx = np.argmax(yb.numpy(), axis=1)
+            w = self.class_w[y_idx]
+            p_true = np.clip(prob[np.arange(len(y_idx)), y_idx], 1e-7, 1.0)
+            f_sum += float(np.sum(w * -np.log(p_true)))
+            w_sum += float(np.sum(w))
+            correct += float(np.sum(np.argmax(prob, axis=1) == y_idx))
+            n += len(y_idx)
+        return f_sum / w_sum, correct / n
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs if logs is not None else {}
+        logs['lr'] = float(np.asarray(self.model.optimizer.learning_rate))
         prob = self.model.predict(self.val_ds, verbose=0)
 
         if not np.all(np.isfinite(prob)):
             # the weights exploded: report the worst possible values so this epoch is never saved as the best one
-            logs.update({'val_loss': np.inf, 'val_accuracy': -1.0, 'val_f1_macro': -1.0, 'val_kappa': -1.0})
+            logs.update({'val_loss': np.inf, 'val_ce': np.inf, 'val_accuracy': -1.0, 'val_f1_macro': -1.0,
+                         'val_kappa': -1.0, 'train_F': np.nan, 'train_accuracy': np.nan})
             print('  epoch {:3d} | NaN/inf in the predictions, this epoch is discarded'.format(epoch + 1))
             return
 
         pred = np.argmax(prob, axis=1)
 
-        p_true = np.clip(prob[np.arange(len(self.y_val)), self.y_val], 1e-7, 1.0)
-        logs['val_loss'] = float(-np.mean(np.log(p_true)))
+        logs['val_loss'], logs['val_ce'] = weighted_ce(prob, self.y_val, self.class_w)
         logs['val_accuracy'] = float(accuracy_score(self.y_val, pred))
         logs['val_f1_macro'] = float(f1_score(self.y_val, pred, average='macro'))
         logs['val_kappa'] = float(cohen_kappa_score(self.y_val, pred))
 
-        print('  epoch {:3d} | train loss {:.4f} cat_ce {:.4f} | val loss {:.4f} acc {:.4f} f1_macro {:.4f} kappa {:.4f}'.format(
-            epoch + 1, logs.get('loss', np.nan), logs.get('categorical_ce', np.nan),
+        if self.train_eval_ds is not None:
+            logs['train_F'], logs['train_accuracy'] = self.training_error()
+        else:
+            logs['train_F'], logs['train_accuracy'] = np.nan, np.nan
+
+        print('  epoch {:3d} | lr {:.2e} | train loss (augmented) {:.4f} | train F {:.4f} acc {:.4f} | '
+              'val F {:.4f} acc {:.4f} f1_macro {:.4f} kappa {:.4f}'.format(
+            epoch + 1, logs['lr'], logs.get('loss', np.nan), logs['train_F'], logs['train_accuracy'],
             logs['val_loss'], logs['val_accuracy'], logs['val_f1_macro'], logs['val_kappa']))
 #------------------------------------------------------------------------------------------------------------------
 
-def train_func(train_ds, val_ds, y_val, stats):
+def monitor_mode(monitor):
+    # validation error: lower is better; F1 / kappa / accuracy: higher is better
+    return 'min' if monitor == 'val_loss' else 'max'
+#------------------------------------------------------------------------------------------------------------------
+
+def train_func(train_ds, val_ds, y_val, stats, class_w, train_eval_ds=None):
     '''
-        train the model, keep the epoch with the best validation score
+        train the model with early stopping (book NND2 Ch.13), keep the weights of the best validation epoch
     '''
 
     model_file = out_file('model_{}.keras'.format(NICKNAME))
-    mode = 'min' if CHECKPOINT_MONITOR == 'val_loss' else 'max'
 
+    # the order matters: ValidationMetrics adds lr / val_* / train_* to the epoch log, the callbacks after it read them
     callbacks = [tf.keras.callbacks.TerminateOnNaN(),   # stops at once if the loss explodes to NaN / inf
-                 ValidationMetrics(val_ds, y_val)]     # must come before the checkpoint: it adds the val_* values
-    callbacks.append(tf.keras.callbacks.ModelCheckpoint(model_file, monitor=CHECKPOINT_MONITOR, mode=mode,
+                 ValidationMetrics(val_ds, y_val, class_w, train_eval_ds)]
+    # weights of the best epoch (point "a" with CHECKPOINT_MONITOR = 'val_loss') -> model_<NICKNAME>.keras
+    callbacks.append(tf.keras.callbacks.ModelCheckpoint(model_file, monitor=CHECKPOINT_MONITOR,
+                                                        mode=monitor_mode(CHECKPOINT_MONITOR),
                                                         save_best_only=True, verbose=1))
+    if LR_SCHEDULE == 'plateau':
+        # alpha <- alpha * LR_FACTOR after LR_PATIENCE epochs without a new best value of EARLY_STOP_MONITOR
+        callbacks.append(tf.keras.callbacks.ReduceLROnPlateau(monitor=EARLY_STOP_MONITOR,
+                                                              mode=monitor_mode(EARLY_STOP_MONITOR),
+                                                              factor=LR_FACTOR, patience=LR_PATIENCE,
+                                                              min_delta=0.0, min_lr=LR_MIN, verbose=1))
     if EARLY_STOP_PATIENCE > 0:
-        callbacks.append(tf.keras.callbacks.EarlyStopping(monitor=CHECKPOINT_MONITOR, mode=mode,
+        # stop after EARLY_STOP_PATIENCE epochs without a new minimum of F_val (point "b"), back to point "a"
+        callbacks.append(tf.keras.callbacks.EarlyStopping(monitor=EARLY_STOP_MONITOR,
+                                                          mode=monitor_mode(EARLY_STOP_MONITOR),
                                                           patience=EARLY_STOP_PATIENCE,
                                                           min_delta=EARLY_STOP_MIN_DELTA,
                                                           restore_best_weights=True, verbose=1))
@@ -706,21 +929,105 @@ def train_func(train_ds, val_ds, y_val, stats):
     return history, best_model
 #------------------------------------------------------------------------------------------------------------------
 
-def predict_labels(ds, final_model):
+def early_stopping_report(history):
     '''
-        returns the predicted class index of every image in ds
+        book NND2 Fig. 13.4 for this run:
+          point "a" = epoch with the minimum validation error F_val   (the weights kept by early stopping)
+          point "b" = last epoch trained (where the training was stopped)
+        writes early_stopping_<NICKNAME>.csv (one row per epoch) and early_stopping_<NICKNAME>.png
+        returns {'a_epoch', 'a_val_F', 'b_epoch', 'saved_epoch'}
     '''
-    res = final_model.predict(ds, verbose=0)
-    # res holds probabilities, keep the index of the most probable class
-    return np.argmax(res, axis=1)
+    h = history.history
+    val_F = np.asarray(h.get('val_loss', []), dtype=float)
+    n = len(val_F)
+    if n == 0 or not np.any(np.isfinite(val_F)):
+        print('Early stopping report skipped: no valid validation error')
+        return {}
+
+    def column(key):
+        v = list(h.get(key, []))[:n]
+        return np.asarray(v + [np.nan] * (n - len(v)), dtype=float)
+
+    epochs = np.arange(1, n + 1)
+    a = int(np.nanargmin(np.where(np.isfinite(val_F), val_F, np.nan))) + 1
+    b = n
+    monitored = column(CHECKPOINT_MONITOR)
+    saved = int(np.nanargmin(monitored) if monitor_mode(CHECKPOINT_MONITOR) == 'min' else np.nanargmax(monitored)) + 1
+    info = {'a_epoch': a, 'a_val_F': float(val_F[a - 1]), 'b_epoch': b, 'saved_epoch': saved}
+
+    print('\n================ EARLY STOPPING (book NND2 Fig. 13.4) ================')
+    print('point a = epoch {} : minimum validation error F_val = {:.4f} (val macro F1 {:.4f})'.format(
+        a, val_F[a - 1], column('val_f1_macro')[a - 1]))
+    print('point b = epoch {} : training stopped, F_val = {:.4f}'.format(b, val_F[b - 1]))
+    print('weights saved to model_{}.keras: epoch {} (best {})'.format(NICKNAME, saved, CHECKPOINT_MONITOR))
+
+    table = pd.DataFrame({'epoch': epochs, 'lr': column('lr'),
+                          'train_loss_keras_augmented': column('loss'),
+                          'train_F_original_images': column('train_F'), 'train_accuracy': column('train_accuracy'),
+                          'val_F': val_F, 'val_ce': column('val_ce'), 'val_accuracy': column('val_accuracy'),
+                          'val_f1_macro': column('val_f1_macro'), 'val_kappa': column('val_kappa')})
+    table.to_csv(out_file('early_stopping_{}.csv'.format(NICKNAME)), index=False)
+
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+    except Exception:
+        print('matplotlib is not installed: early_stopping_{}.png skipped (the numbers are in the .csv)'.format(NICKNAME))
+        return info
+
+    # three panels side by side, one measure each (no second y-axis): F as in Fig. 13.4, validation macro F1, alpha
+    fig, axes = plt.subplots(1, 3, figsize=(17, 5), gridspec_kw={'width_ratios': [1.5, 1, 1]})
+
+    ax = axes[0]
+    ax.plot(epochs, val_F, color='#1f3fd1', lw=2, label='Validation')
+    if np.any(np.isfinite(table['train_F_original_images'])):
+        ax.plot(epochs, table['train_F_original_images'], color='black', lw=2, label='Training (original images)')
+    ax.plot(epochs, table['train_loss_keras_augmented'], color='0.55', lw=1.2, ls='--',
+            label='Training, as printed by Keras (augmented)')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_ylabel('F (cross-entropy{})'.format(', class-weighted' if CLASS_WEIGHTS != 'none' else ''))
+    ax.set_title('Early stopping (NND2 Fig. 13.4): a = epoch {}, b = epoch {}'.format(a, b))
+    ax.legend(frameon=False, loc='best')
+
+    ax = axes[1]
+    ax.plot(epochs, table['val_f1_macro'], color='#1f3fd1', lw=2)
+    ax.set_xscale('log')
+    ax.set_ylabel('validation macro F1')
+    ax.set_title('Validation macro F1')
+
+    ax = axes[2]
+    ax.step(epochs, table['lr'], where='post', color='black', lw=2)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_ylabel('learning rate alpha')
+    ax.set_title('Learning rate ({})'.format(LR_SCHEDULE))
+
+    for ax in axes:
+        ax.set_title(ax.get_title(), pad=24)    # room for the a / b labels above the plot
+        ax.set_xlabel('Epoch (iteration)')
+        ax.grid(True, which='major', color='0.9', lw=0.8)
+        for spine in ('top', 'right'):
+            ax.spines[spine].set_visible(False)
+        # a = b when F_val was still going down at the last epoch (no overfitting seen yet: try more epochs)
+        for x, name in (((a, 'a'), (b, 'b')) if a != b else ((a, 'a = b'),)):
+            ax.axvline(x, color='0.35', ls=':', lw=1.2)
+            ax.text(x, 1.01, name, transform=ax.get_xaxis_transform(), ha='center', va='bottom', fontsize=13)
+
+    fig.tight_layout()
+    file_name = out_file('early_stopping_{}.png'.format(NICKNAME))
+    fig.savefig(file_name, dpi=130)
+    plt.close(fig)
+    print('Early stopping plot saved to', file_name)
+    return info
 #------------------------------------------------------------------------------------------------------------------
 
-def predict_func(test_ds, final_model):
+def predict_func(pred):
     '''
         predict function: writes results_<NICKNAME>.xlsx (same format as the template)
+        pred = predicted class index of every row of xdf_dset
     '''
-
-    pred = predict_labels(test_ds, final_model)
 
     if len(pred) != len(xdf_dset):
         raise ValueError('{} predictions for {} rows'.format(len(pred), len(xdf_dset)))
@@ -729,12 +1036,13 @@ def predict_func(test_ds, final_model):
     xdf_dset.to_excel(out_file('results_{}.xlsx'.format(NICKNAME)), index=False)
 #------------------------------------------------------------------------------------------------------------------
 
-def metrics_func(metrics, aggregates=None):
+def metrics_func(metrics, aggregates=None, confusion=True):
     '''
     multiple functiosn of metrics to call each function
     f1, cohen, accuracy, mattews correlation
     list of metrics: f1_micro, f1_macro, f1_weighted, coh, acc, mat
     list of aggregates : avg, sum
+    confusion: also print the confusion matrix
     :return: dict with the value of each metric
     '''
 
@@ -813,9 +1121,14 @@ def metrics_func(metrics, aggregates=None):
     if 'avg' in aggregates and xcont > 0:
         print('Average of Metrics : ', xsum/xcont)
 
-    # rows = true class, columns = predicted class
-    print('Confusion matrix (rows = true, columns = predicted), classes:', list(class_names))
-    print(confusion_matrix(y_true, y_pred, labels=list(range(len(class_names)))))
+    if confusion:
+        # rows = true class, columns = predicted class
+        print('Confusion matrix (rows = true, columns = predicted), classes:', list(class_names))
+        cm = confusion_matrix(y_true, y_pred, labels=list(range(len(class_names))))
+        print(cm)
+        # recall of every class = correct / images of that class (diagonal / row sum)
+        recall = np.diag(cm) / np.maximum(cm.sum(axis=1), 1)
+        print('Recall per class:', ' '.join('{} {:.2f}'.format(c, r) for c, r in zip(class_names, recall)))
 
     return values
 #------------------------------------------------------------------------------------------------------------------
@@ -824,36 +1137,50 @@ def dropout_used():
     # Dropout is not combined with BatchNorm
     return DROPOUT_RATE if not USE_BATCHNORM else 0.0
 
+def lr_schedule_text():
+    if LR_SCHEDULE == 'none':
+        return 'none'
+    return 'plateau x{:g} after {} ep, min {:g}'.format(LR_FACTOR, LR_PATIENCE, LR_MIN)
+
+def tta_text():
+    return '{} views'.format(len(tta_views(trained_flips()))) if TTA else 'off'
+
 def settings_text():
     return ('NORM_MODE={} | HIDDEN={} | DROPOUT={} | BATCHNORM={} | WEIGHT_DECAY={} | OPTIMIZER={} | LR={} | '
-            'INIT={} | CLIP={} | EPOCHS={} | EARLY_STOP={}/{} | SHUFFLE={} | BATCH={} | IMAGE_SIZE={} | '
-            'JPEG_RATIO={} | ANTIALIAS={} | AUGMENT={} | VAL_FRACTION={} | MONITOR={} | SEED={}').format(
-        NORM_MODE, HIDDEN_LAYERS, dropout_used(), USE_BATCHNORM, WEIGHT_DECAY, OPTIMIZER, LEARNING_RATE, KERNEL_INIT, CLIP_NORM, n_epoch,
-        EARLY_STOP_PATIENCE, EARLY_STOP_MIN_DELTA, SHUFFLE_EACH_EPOCH, BATCH_SIZE, IMAGE_SIZE,
-        JPEG_DECODE_RATIO, ANTIALIAS, augmentation_text(), VAL_FRACTION, CHECKPOINT_MONITOR, SEED)
+            'LR_SCHEDULE={} | INIT={} | CLIP={} | EPOCHS={} | EARLY_STOP={} {}/{} | SHUFFLE={} | BATCH={} | '
+            'IMAGE_SIZE={} | JPEG_RATIO={} | ANTIALIAS={} | AUGMENT={} | CLASS_WEIGHTS={} | TTA={} | VAL_FRACTION={} | '
+            'CHECKPOINT={} | SEED={}').format(
+        NORM_MODE, HIDDEN_LAYERS, dropout_used(), USE_BATCHNORM, WEIGHT_DECAY, OPTIMIZER, LEARNING_RATE,
+        lr_schedule_text(), KERNEL_INIT, CLIP_NORM, n_epoch, EARLY_STOP_MONITOR, EARLY_STOP_PATIENCE,
+        EARLY_STOP_MIN_DELTA, SHUFFLE_EACH_EPOCH, BATCH_SIZE, IMAGE_SIZE, JPEG_DECODE_RATIO, ANTIALIAS,
+        augmentation_text(), CLASS_WEIGHTS, tta_text(), VAL_FRACTION, CHECKPOINT_MONITOR, SEED)
 #------------------------------------------------------------------------------------------------------------------
 
-def log_experiment(history, val_values, test_values):
+def log_experiment(history, val_values, test_values, es_info, val_plain, test_plain):
     '''
         appends one line per run to experiments_<NICKNAME>.csv so different combinations can be compared
         (an extra file; the official output files are not changed)
+        val_values / test_values: final numbers (with TTA when TTA is on); val_plain / test_plain: without TTA
     '''
-    monitored = history.history.get(CHECKPOINT_MONITOR, [])
-    best_epoch = ''
-    if len(monitored) > 0:
-        best_epoch = int(np.argmin(monitored) if CHECKPOINT_MONITOR == 'val_loss' else np.argmax(monitored)) + 1
+    lrs = history.history.get('lr', [])
 
     row = {'date': datetime.now().strftime('%Y-%m-%d %H:%M'),
            'norm': NORM_MODE, 'hidden': str(HIDDEN_LAYERS), 'dropout': dropout_used(),
            'batchnorm': USE_BATCHNORM, 'weight_decay': WEIGHT_DECAY,
-           'optimizer': OPTIMIZER, 'lr': LEARNING_RATE, 'init': KERNEL_INIT, 'clip': CLIP_NORM, 'shuffle': SHUFFLE_EACH_EPOCH, 'patience': EARLY_STOP_PATIENCE,
-           'epochs_run': len(history.history.get('loss', [])), 'best_epoch': best_epoch,
+           'optimizer': OPTIMIZER, 'lr': LEARNING_RATE, 'lr_schedule': lr_schedule_text(),
+           'final_lr': float(lrs[-1]) if len(lrs) else '',
+           'init': KERNEL_INIT, 'clip': CLIP_NORM, 'shuffle': SHUFFLE_EACH_EPOCH,
+           'stop_monitor': EARLY_STOP_MONITOR, 'patience': EARLY_STOP_PATIENCE,
+           'epochs_run': len(history.history.get('loss', [])), 'best_epoch': es_info.get('saved_epoch', ''),
+           'a_epoch': es_info.get('a_epoch', ''), 'a_val_F': es_info.get('a_val_F', ''),
            'batch': BATCH_SIZE, 'image_size': IMAGE_SIZE, 'jpeg_ratio': JPEG_DECODE_RATIO, 'antialias': ANTIALIAS,
-           'augment': augmentation_text(), 'monitor': CHECKPOINT_MONITOR, 'seed': SEED,
+           'augment': augmentation_text(), 'class_weights': CLASS_WEIGHTS, 'tta': tta_text(),
+           'monitor': CHECKPOINT_MONITOR, 'seed': SEED,
            'val_f1_macro': val_values.get('f1_macro'), 'val_kappa': val_values.get('coh'),
            'val_acc': val_values.get('acc'),
            'test_f1_macro': test_values.get('f1_macro'), 'test_kappa': test_values.get('coh'),
-           'test_acc': test_values.get('acc')}
+           'test_acc': test_values.get('acc'),
+           'val_f1_macro_no_tta': val_plain.get('f1_macro'), 'test_f1_macro_no_tta': test_plain.get('f1_macro')}
 
     file_name = out_file('experiments_{}.csv'.format(NICKNAME))
     new_file = not os.path.exists(file_name)
@@ -915,9 +1242,20 @@ def main():
     print('Training images: {}   Validation images: {}'.format(len(xdf_tr), len(xdf_val)))
 
     cache = resolve_cache_mode(len(xdf_tr) + len(xdf_val))
-    train_clean_ds = read_data(xdf_tr, OUTPUTS_a, cache=cache, shuffle=SHUFFLE_EACH_EPOCH)   # original images
+    # train_clean_ds: original images, reshuffled every epoch; train_eval_ds: the same cached images in a fixed order
+    train_clean_ds, train_eval_ds = read_data(xdf_tr, OUTPUTS_a, cache=cache, shuffle=SHUFFLE_EACH_EPOCH,
+                                              with_unshuffled=True)
     val_ds = read_data(xdf_val, OUTPUTS_a, cache=cache)
     y_val = xdf_val['target'].map(class_to_idx).to_numpy()
+
+    if TRAIN_CURVE and train_eval_ds is None:
+        print('TRAIN_CURVE: no RAM cache, the training error on the original images is skipped '
+              '(reading all training images from disk every epoch would be too slow)')
+    if not TRAIN_CURVE:
+        train_eval_ds = None
+
+    ## Class weights from the training part only
+    class_w = compute_class_weights(xdf_tr['target'].map(class_to_idx).to_numpy(), OUTPUTS_a)
 
     ## Data augmentation: training images only, added after the cache (validation and test stay original)
     if AUGMENT:
@@ -927,39 +1265,67 @@ def main():
     else:
         train_ds = train_clean_ds
 
+    ## the loss of every training image is multiplied by the weight of its class
+    if CLASS_WEIGHTS != 'none':
+        train_ds = add_sample_weights(train_ds, class_w)
+
     ## Normalization statistics from the training part only, on the ORIGINAL images (the test images are not
-    ## augmented, so the input layer must be centred and scaled for them). This pass also fills the RAM cache.
+    ## augmented, so the input layer must be centred and scaled for them). This pass also fills the RAM cache
+    ## (read in a fixed order when the cache is on: no shuffle buffer to fill while the JPEGs are decoded).
     stats = None
     if NORM_MODE in ('minmax', 'zscore'):
-        stats = compute_input_stats(train_clean_ds)
+        stats = compute_input_stats(train_eval_ds if train_eval_ds is not None else train_clean_ds)
 
     # best_model = the best saved epoch, loaded once from model_<NICKNAME>.keras for validation and test
-    history, best_model = train_func(train_ds, val_ds, y_val, stats)
+    history, best_model = train_func(train_ds, val_ds, y_val, stats, class_w, train_eval_ds)
 
-    ## Metrics of the best saved model on the validation part
+    ## Point "a", point "b", early_stopping_<NICKNAME>.png / .csv
+    es_info = early_stopping_report(history)
+
+    use_tta = TTA and len(tta_views(trained_flips())) > 1
+    tta_label = 'TTA, {} views: original + flips {}'.format(len(tta_views(trained_flips())), trained_flips())
+
+    ## Metrics of the best saved model on the validation part (without TTA, then with TTA)
 
     print('\n================ VALIDATION (best saved epoch) ================')
     xdf_dset = xdf_val.copy()
-    xdf_dset['results'] = predict_labels(val_ds, best_model)
-    val_values = metrics_func(['f1_macro', 'coh', 'acc'], ['avg'])
+    xdf_dset['results'] = np.argmax(predict_proba(best_model, val_ds), axis=1)
+    if use_tta:
+        print('--- without TTA ---')
+    val_plain = metrics_func(['f1_macro', 'coh', 'acc'], ['avg'], confusion=not use_tta)
+    val_values = val_plain
+    if use_tta:
+        print('--- with {} ---'.format(tta_label))
+        xdf_dset['results'] = np.argmax(predict_proba(best_model, val_ds, tta=True), axis=1)
+        val_values = metrics_func(['f1_macro', 'coh', 'acc'], ['avg'])
 
-    ## Test dataset -> results_<NICKNAME>.xlsx
+    ## Test dataset -> results_<NICKNAME>.xlsx (with TTA when TTA is on, like test_Matthew.py)
 
     print('\n================ TEST ================')
     xdf_dset = xdf_data[xdf_data["split"] == 'test'].copy()
     if len(xdf_dset) == 0:
         raise ValueError('No rows with split == "test" in {}'.format(FILE_NAME))
 
-    test_ds= read_data(xdf_dset, OUTPUTS_a)
-    predict_func(test_ds, best_model)
+    # with TTA the test images are predicted twice (without / with TTA): with the RAM cache they are decoded only once
+    # (~1.2 GB in RAM during this step only)
+    test_ds= read_data(xdf_dset, OUTPUTS_a, cache='memory' if (use_tta and cache == 'memory') else None)
 
     ## Metrics Function over the result of the test dataset
     list_of_metrics = ['f1_macro', 'coh', 'acc']
     list_of_agg = ['avg']
-    test_values = metrics_func(list_of_metrics, list_of_agg)
+
+    if use_tta:
+        print('--- without TTA ---')
+    predict_func(np.argmax(predict_proba(best_model, test_ds), axis=1))
+    test_plain = metrics_func(list_of_metrics, list_of_agg, confusion=not use_tta)
+    test_values = test_plain
+    if use_tta:
+        print('--- with {} ---'.format(tta_label))
+        predict_func(np.argmax(predict_proba(best_model, test_ds, tta=True), axis=1))
+        test_values = metrics_func(list_of_metrics, list_of_agg)
 
     print('\nSETTINGS:', settings_text(), '| CACHE={}'.format(cache))
-    log_experiment(history, val_values, test_values)
+    log_experiment(history, val_values, test_values, es_info, val_plain, test_plain)
 # ------------------------------------------------------------------------------------------------------------------
 
 
