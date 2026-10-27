@@ -1,0 +1,154 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1793108117.184706    2295 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+E0000 00:00:1793108127.080448    2295 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
+SETTINGS: NORM_MODE=minmax | HIDDEN=[256, 256, 192, 192, 128, 128, 128, 64, 64, 64] | DROPOUT=0.2 | BATCHNORM=False | WEIGHT_DECAY=0.0 | OPTIMIZER=adam | LR=0.001 | LR_SCHEDULE=plateau x0.5 after 4 ep, min 1e-05 | INIT=he_normal | CLIP=1.0 | EPOCHS=100 | EARLY_STOP=val_loss 25/0.0 | SHUFFLE=True | BATCH=32 | IMAGE_SIZE=200 | JPEG_RATIO=8 | ANTIALIAS=True | AUGMENT=flipH flipV rot20 zoom0.1 shift0.1 reflect | CLASS_WEIGHTS=balanced | TTA=4 views | VAL_FRACTION=0.2 | CHECKPOINT=val_loss | SEED=42
+Training images: 9674   Validation images: 2419
+Cache: ON  - 5.8 GB of images kept in RAM (15.3 GB free)
+Class weights (balanced):
+  class1       897 training images   w = 1.797
+  class2      1781 training images   w = 0.905
+  class3      2589 training images   w = 0.623
+  class4       663 training images   w = 2.432
+  class5      1042 training images   w = 1.547
+  class6      2702 training images   w = 0.597
+Augmentation preview saved to /home/ubuntu/DL_ImageClassification/Code/augmentation_preview_Matthew.png
+Computing normalization statistics on the training images ...
+  images used: 9674   pixel range [0.000, 1.000]   mean of pmean 0.505   mean of pstd 0.176
+Model: "MLP_Matthew_flip_hv_prep_r8_aa"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ minmax_norm_minus1_to_1         │ (None, 120000)         │             0 │
+│ (Normalization)                 │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense (Dense)                   │ (None, 256)            │    30,720,256 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation (Activation)         │ (None, 256)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout (Dropout)               │ (None, 256)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_1 (Dense)                 │ (None, 256)            │        65,792 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_1 (Activation)       │ (None, 256)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_1 (Dropout)             │ (None, 256)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_2 (Dense)                 │ (None, 192)            │        49,344 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_2 (Activation)       │ (None, 192)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_2 (Dropout)             │ (None, 192)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_3 (Dense)                 │ (None, 192)            │        37,056 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_3 (Activation)       │ (None, 192)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_3 (Dropout)             │ (None, 192)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_4 (Dense)                 │ (None, 128)            │        24,704 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_4 (Activation)       │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_4 (Dropout)             │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_5 (Dense)                 │ (None, 128)            │        16,512 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_5 (Activation)       │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_5 (Dropout)             │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_6 (Dense)                 │ (None, 128)            │        16,512 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_6 (Activation)       │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_6 (Dropout)             │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_7 (Dense)                 │ (None, 64)             │         8,256 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_7 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_7 (Dropout)             │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_8 (Dense)                 │ (None, 64)             │         4,160 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_8 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_8 (Dropout)             │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_9 (Dense)                 │ (None, 64)             │         4,160 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_9 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_9 (Dropout)             │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_10 (Dense)                │ (None, 6)              │           390 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 30,947,142 (118.05 MB)
+ Trainable params: 30,947,142 (118.05 MB)
+ Non-trainable params: 0 (0.00 B)
+Epoch 1/100
+  epoch   1 | lr 1.00e-03 | train loss (augmented) 5.1927 | train F 1.7933 acc 0.0927 | val F 1.7933 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 1: val_loss improved from None to 1.79328, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 1: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 128s - 422ms/step - categorical_ce: 4.9924 - loss: 5.1927 - lr: 0.0010 - val_loss: 1.7933 - val_ce: 1.7842 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7933 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 2/100
+  epoch   2 | lr 1.00e-03 | train loss (augmented) 1.8241 | train F 1.7924 acc 0.0927 | val F 1.7924 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 2: val_loss improved from 1.79328 to 1.79243, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 2: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 97s - 320ms/step - categorical_ce: 1.8088 - loss: 1.8241 - lr: 0.0010 - val_loss: 1.7924 - val_ce: 1.7884 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7924 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 3/100
+  epoch   3 | lr 1.00e-03 | train loss (augmented) 1.8112 | train F 1.7919 acc 0.0927 | val F 1.7919 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 3: val_loss improved from 1.79243 to 1.79190, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 3: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 100s - 330ms/step - categorical_ce: 1.7993 - loss: 1.8112 - lr: 0.0010 - val_loss: 1.7919 - val_ce: 1.7921 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7919 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 4/100
+  epoch   4 | lr 1.00e-03 | train loss (augmented) 1.8088 | train F 1.7919 acc 0.0927 | val F 1.7919 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 4: val_loss improved from 1.79190 to 1.79187, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 4: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 100s - 332ms/step - categorical_ce: 1.8011 - loss: 1.8088 - lr: 0.0010 - val_loss: 1.7919 - val_ce: 1.7939 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7919 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 5/100
+  epoch   5 | lr 1.00e-03 | train loss (augmented) 1.7980 | train F 1.7918 acc 0.0927 | val F 1.7918 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 5: val_loss improved from 1.79187 to 1.79179, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 5: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 98s - 322ms/step - categorical_ce: 1.7969 - loss: 1.7980 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7923 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 6/100
+  epoch   6 | lr 1.00e-03 | train loss (augmented) 1.8031 | train F 1.7918 acc 0.0927 | val F 1.7918 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 6: val_loss improved from 1.79179 to 1.79177, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 6: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 98s - 324ms/step - categorical_ce: 1.7978 - loss: 1.8031 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7917 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 7/100
+  epoch   7 | lr 1.00e-03 | train loss (augmented) 1.7942 | train F 1.7918 acc 0.1077 | val F 1.7918 acc 0.1075 f1_macro 0.0324 kappa 0.0000
+
+Epoch 7: val_loss did not improve from 1.79177
+303/303 - 99s - 326ms/step - categorical_ce: 1.7938 - loss: 1.7942 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7935 - val_accuracy: 0.1075 - val_f1_macro: 0.0324 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.1077 - learning_rate: 0.0010
+Epoch 8/100
+  epoch   8 | lr 1.00e-03 | train loss (augmented) 1.7982 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 8: val_loss did not improve from 1.79177
+303/303 - 95s - 313ms/step - categorical_ce: 1.8009 - loss: 1.7982 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7927 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 0.0010
+Epoch 9/100
+  epoch   9 | lr 1.00e-03 | train loss (augmented) 1.8064 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 9: val_loss improved from 1.79177 to 1.79176, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 9: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 98s - 325ms/step - categorical_ce: 1.8017 - loss: 1.8064 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7918 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 0.0010
+Epoch 10/100
+  epoch  10 | lr 1.00e-03 | train loss (augmented) 1.7981 | train F 1.7918 acc 0.2676 | val F 1.7918 acc 0.2679 f1_macro 0.0704 kappa 0.0000
+
+Epoch 10: val_loss did not improve from 1.79176
+303/303 - 96s - 316ms/step - categorical_ce: 1.7965 - loss: 1.7981 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7907 - val_accuracy: 0.2679 - val_f1_macro: 0.0704 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2676 - learning_rate: 0.0010
+Epoch 11/100

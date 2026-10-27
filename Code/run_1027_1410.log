@@ -1,0 +1,427 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1793110205.765186    5124 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+I0000 00:00:1793110209.759649    5124 gpu_device.cc:2043] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 20795 MB memory:  -> device: 0, name: NVIDIA A10G, pci bus id: 0000:00:1e.0, compute capability: 8.6
+SETTINGS: NORM_MODE=minmax | HIDDEN=[256, 256, 192, 192, 128, 128, 128, 64, 64, 64] | DROPOUT=0.2 | BATCHNORM=False | WEIGHT_DECAY=0.0 | OPTIMIZER=adam | LR=0.001 | LR_SCHEDULE=plateau x0.5 after 4 ep, min 1e-05 | INIT=he_normal | CLIP=1.0 | EPOCHS=100 | EARLY_STOP=val_loss 25/0.0 | SHUFFLE=True | BATCH=32 | IMAGE_SIZE=200 | JPEG_RATIO=8 | ANTIALIAS=True | AUGMENT=flipH flipV rot20 zoom0.1 shift0.1 reflect | CLASS_WEIGHTS=balanced | TTA=4 views | VAL_FRACTION=0.2 | CHECKPOINT=val_loss | SEED=42
+Training images: 9674   Validation images: 2419
+Cache: ON  - 5.8 GB of images kept in RAM (14.7 GB free)
+Class weights (balanced):
+  class1       897 training images   w = 1.797
+  class2      1781 training images   w = 0.905
+  class3      2589 training images   w = 0.623
+  class4       663 training images   w = 2.432
+  class5      1042 training images   w = 1.547
+  class6      2702 training images   w = 0.597
+Augmentation preview saved to /home/ubuntu/DL_ImageClassification/Code/augmentation_preview_Matthew.png
+Computing normalization statistics on the training images ...
+  images used: 9674   pixel range [0.000, 1.000]   mean of pmean 0.505   mean of pstd 0.176
+Model: "MLP_Matthew_flip_hv_prep_r8_aa"
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Layer (type)                    ┃ Output Shape           ┃       Param # ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ minmax_norm_minus1_to_1         │ (None, 120000)         │             0 │
+│ (Normalization)                 │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense (Dense)                   │ (None, 256)            │    30,720,256 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation (Activation)         │ (None, 256)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout (Dropout)               │ (None, 256)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_1 (Dense)                 │ (None, 256)            │        65,792 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_1 (Activation)       │ (None, 256)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_1 (Dropout)             │ (None, 256)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_2 (Dense)                 │ (None, 192)            │        49,344 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_2 (Activation)       │ (None, 192)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_2 (Dropout)             │ (None, 192)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_3 (Dense)                 │ (None, 192)            │        37,056 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_3 (Activation)       │ (None, 192)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_3 (Dropout)             │ (None, 192)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_4 (Dense)                 │ (None, 128)            │        24,704 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_4 (Activation)       │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_4 (Dropout)             │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_5 (Dense)                 │ (None, 128)            │        16,512 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_5 (Activation)       │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_5 (Dropout)             │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_6 (Dense)                 │ (None, 128)            │        16,512 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_6 (Activation)       │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_6 (Dropout)             │ (None, 128)            │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_7 (Dense)                 │ (None, 64)             │         8,256 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_7 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_7 (Dropout)             │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_8 (Dense)                 │ (None, 64)             │         4,160 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_8 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_8 (Dropout)             │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_9 (Dense)                 │ (None, 64)             │         4,160 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ activation_9 (Activation)       │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout_9 (Dropout)             │ (None, 64)             │             0 │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_10 (Dense)                │ (None, 6)              │           390 │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+ Total params: 30,947,142 (118.05 MB)
+ Trainable params: 30,947,142 (118.05 MB)
+ Non-trainable params: 0 (0.00 B)
+Epoch 1/100
+I0000 00:00:1793110333.104939    5183 service.cc:153] XLA service 0x72213101c630 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+I0000 00:00:1793110333.104966    5183 service.cc:161]   StreamExecutor [0]: NVIDIA A10G, Compute Capability 8.6 (Driver: 13.2.0; Runtime: 12.9.0; Toolkit: 12.5.0; DNN: 9.24.0)
+I0000 00:00:1793110333.244474    5183 dump_mlir_util.cc:269] disabling MLIR crash reproducer, set env var `MLIR_CRASH_REPRODUCER_DIRECTORY` to enable.
+I0000 00:00:1793110333.813793    5183 cuda_dnn.cc:461] Loaded cuDNN version 92400
+I0000 00:00:1793110334.103761    5183 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_6357__.57
+I0000 00:00:1793110334.433841    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110335.563964    6078 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_60', 12 bytes spill stores, 12 bytes spill loads
+
+I0000 00:00:1793110335.893546    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110339.447850    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110340.575344    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110341.905461    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110343.238166    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110344.164034    6076 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_68', 28 bytes spill stores, 28 bytes spill loads
+
+I0000 00:00:1793110344.371361    6077 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_68', 12 bytes spill stores, 12 bytes spill loads
+
+I0000 00:00:1793110344.379609    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110345.288504    6077 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_72', 12 bytes spill stores, 12 bytes spill loads
+
+I0000 00:00:1793110345.593654    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110347.005940    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110349.306971    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110350.781064    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110351.798723    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110359.779183    5183 device_compiler.h:208] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.
+I0000 00:00:1793110379.740768    5184 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_6357__.57
+I0000 00:00:1793110381.871933    5184 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110385.530158    5184 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110393.944042    5182 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110394.993011    6847 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_32', 76 bytes spill stores, 76 bytes spill loads
+
+I0000 00:00:1793110395.203661    5182 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110396.499084    6850 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_36', 76 bytes spill stores, 76 bytes spill loads
+
+I0000 00:00:1793110396.658872    5182 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110397.748592    6850 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_38', 164 bytes spill stores, 164 bytes spill loads
+
+I0000 00:00:1793110428.162348    5185 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110429.548989    7089 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_38', 164 bytes spill stores, 164 bytes spill loads
+
+I0000 00:00:1793110431.825321    5185 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110433.199312    7089 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_32', 76 bytes spill stores, 76 bytes spill loads
+
+I0000 00:00:1793110433.210066    5185 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110434.558659    7087 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_36', 76 bytes spill stores, 76 bytes spill loads
+
+I0000 00:00:1793110438.682708    5183 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793110439.517495    7192 subprocess_compilation.cc:348] ptxas warning : Registers are spilled to local memory in function 'gemm_fusion_MatMul_32', 76 bytes spill stores, 76 bytes spill loads
+
+  epoch   1 | lr 1.00e-03 | train loss (augmented) 5.1756 | train F 1.7932 acc 0.0933 | val F 1.7932 acc 0.0934 f1_macro 0.0293 kappa 0.0007
+
+Epoch 1: val_loss improved from None to 1.79317, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 1: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 114s - 377ms/step - categorical_ce: 5.0132 - loss: 5.1756 - lr: 0.0010 - val_loss: 1.7932 - val_ce: 1.7891 - val_accuracy: 0.0934 - val_f1_macro: 0.0293 - val_kappa: 7.4103e-04 - train_F: 1.7932 - train_accuracy: 0.0933 - learning_rate: 0.0010
+Epoch 2/100
+  epoch   2 | lr 1.00e-03 | train loss (augmented) 1.8373 | train F 1.7922 acc 0.2793 | val F 1.7922 acc 0.2795 f1_macro 0.0728 kappa 0.0000
+
+Epoch 2: val_loss improved from 1.79317 to 1.79222, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 2: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 13s - 44ms/step - categorical_ce: 1.8198 - loss: 1.8373 - lr: 0.0010 - val_loss: 1.7922 - val_ce: 1.7892 - val_accuracy: 0.2795 - val_f1_macro: 0.0728 - val_kappa: 0.0000e+00 - train_F: 1.7922 - train_accuracy: 0.2793 - learning_rate: 0.0010
+Epoch 3/100
+  epoch   3 | lr 1.00e-03 | train loss (augmented) 1.8110 | train F 1.7918 acc 0.0927 | val F 1.7918 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 3: val_loss improved from 1.79222 to 1.79181, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 3: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 13s - 44ms/step - categorical_ce: 1.7975 - loss: 1.8110 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7899 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 4/100
+  epoch   4 | lr 1.00e-03 | train loss (augmented) 1.8024 | train F 1.7918 acc 0.2793 | val F 1.7918 acc 0.2795 f1_macro 0.0728 kappa 0.0000
+
+Epoch 4: val_loss improved from 1.79181 to 1.79179, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 4: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 13s - 44ms/step - categorical_ce: 1.7926 - loss: 1.8024 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7892 - val_accuracy: 0.2795 - val_f1_macro: 0.0728 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2793 - learning_rate: 0.0010
+Epoch 5/100
+  epoch   5 | lr 1.00e-03 | train loss (augmented) 1.8029 | train F 1.7918 acc 0.2793 | val F 1.7918 acc 0.2795 f1_macro 0.0728 kappa 0.0000
+
+Epoch 5: val_loss improved from 1.79179 to 1.79177, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 5: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 13s - 44ms/step - categorical_ce: 1.7961 - loss: 1.8029 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7901 - val_accuracy: 0.2795 - val_f1_macro: 0.0728 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2793 - learning_rate: 0.0010
+Epoch 6/100
+  epoch   6 | lr 1.00e-03 | train loss (augmented) 1.8035 | train F 1.7918 acc 0.0927 | val F 1.7918 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 6: val_loss did not improve from 1.79177
+303/303 - 10s - 33ms/step - categorical_ce: 1.7986 - loss: 1.8035 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7910 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 7/100
+  epoch   7 | lr 1.00e-03 | train loss (augmented) 1.7967 | train F 1.7918 acc 0.2676 | val F 1.7918 acc 0.2679 f1_macro 0.0704 kappa 0.0000
+
+Epoch 7: val_loss improved from 1.79177 to 1.79177, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 7: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 13s - 44ms/step - categorical_ce: 1.7935 - loss: 1.7967 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7898 - val_accuracy: 0.2679 - val_f1_macro: 0.0704 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2676 - learning_rate: 0.0010
+Epoch 8/100
+  epoch   8 | lr 1.00e-03 | train loss (augmented) 1.8029 | train F 1.7918 acc 0.2676 | val F 1.7918 acc 0.2679 f1_macro 0.0704 kappa 0.0000
+
+Epoch 8: val_loss did not improve from 1.79177
+303/303 - 10s - 33ms/step - categorical_ce: 1.7990 - loss: 1.8029 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7898 - val_accuracy: 0.2679 - val_f1_macro: 0.0704 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2676 - learning_rate: 0.0010
+Epoch 9/100
+  epoch   9 | lr 1.00e-03 | train loss (augmented) 1.7948 | train F 1.7918 acc 0.2676 | val F 1.7918 acc 0.2679 f1_macro 0.0704 kappa 0.0000
+
+Epoch 9: val_loss did not improve from 1.79177
+303/303 - 10s - 33ms/step - categorical_ce: 1.7934 - loss: 1.7948 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7879 - val_accuracy: 0.2679 - val_f1_macro: 0.0704 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2676 - learning_rate: 0.0010
+Epoch 10/100
+  epoch  10 | lr 1.00e-03 | train loss (augmented) 1.7921 | train F 1.7918 acc 0.2676 | val F 1.7918 acc 0.2679 f1_macro 0.0704 kappa 0.0000
+
+Epoch 10: val_loss improved from 1.79177 to 1.79176, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 10: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 13s - 44ms/step - categorical_ce: 1.7908 - loss: 1.7921 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7908 - val_accuracy: 0.2679 - val_f1_macro: 0.0704 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2676 - learning_rate: 0.0010
+Epoch 11/100
+  epoch  11 | lr 1.00e-03 | train loss (augmented) 1.7921 | train F 1.7918 acc 0.2676 | val F 1.7918 acc 0.2679 f1_macro 0.0704 kappa 0.0000
+
+Epoch 11: val_loss improved from 1.79176 to 1.79176, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 11: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 13s - 44ms/step - categorical_ce: 1.7916 - loss: 1.7921 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7916 - val_accuracy: 0.2679 - val_f1_macro: 0.0704 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2676 - learning_rate: 0.0010
+Epoch 12/100
+  epoch  12 | lr 1.00e-03 | train loss (augmented) 1.7921 | train F 1.7918 acc 0.0927 | val F 1.7918 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 12: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7903 - loss: 1.7921 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7928 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 13/100
+  epoch  13 | lr 1.00e-03 | train loss (augmented) 1.7967 | train F 1.7918 acc 0.1077 | val F 1.7918 acc 0.1075 f1_macro 0.0324 kappa 0.0000
+
+Epoch 13: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7955 - loss: 1.7967 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7938 - val_accuracy: 0.1075 - val_f1_macro: 0.0324 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.1077 - learning_rate: 0.0010
+Epoch 14/100
+  epoch  14 | lr 1.00e-03 | train loss (augmented) 1.7934 | train F 1.7918 acc 0.0927 | val F 1.7918 acc 0.0926 f1_macro 0.0283 kappa 0.0000
+
+Epoch 14: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7950 - loss: 1.7934 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7923 - val_accuracy: 0.0926 - val_f1_macro: 0.0283 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0927 - learning_rate: 0.0010
+Epoch 15/100
+  epoch  15 | lr 1.00e-03 | train loss (augmented) 1.7931 | train F 1.7918 acc 0.1841 | val F 1.7918 acc 0.1840 f1_macro 0.0518 kappa 0.0000
+
+Epoch 15: val_loss did not improve from 1.79176
+
+Epoch 15: ReduceLROnPlateau reducing learning rate to 0.0005000000237487257.
+303/303 - 10s - 34ms/step - categorical_ce: 1.7938 - loss: 1.7931 - lr: 0.0010 - val_loss: 1.7918 - val_ce: 1.7913 - val_accuracy: 0.1840 - val_f1_macro: 0.0518 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.1841 - learning_rate: 0.0010
+Epoch 16/100
+  epoch  16 | lr 5.00e-04 | train loss (augmented) 1.7930 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 16: val_loss improved from 1.79176 to 1.79176, saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+
+Epoch 16: finished saving model to /home/ubuntu/DL_ImageClassification/Code/model_Matthew.keras
+303/303 - 13s - 44ms/step - categorical_ce: 1.7916 - loss: 1.7930 - lr: 5.0000e-04 - val_loss: 1.7918 - val_ce: 1.7918 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 5.0000e-04
+Epoch 17/100
+  epoch  17 | lr 5.00e-04 | train loss (augmented) 1.7922 | train F 1.7918 acc 0.2793 | val F 1.7918 acc 0.2795 f1_macro 0.0728 kappa 0.0000
+
+Epoch 17: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7926 - loss: 1.7922 - lr: 5.0000e-04 - val_loss: 1.7918 - val_ce: 1.7909 - val_accuracy: 0.2795 - val_f1_macro: 0.0728 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.2793 - learning_rate: 5.0000e-04
+Epoch 18/100
+  epoch  18 | lr 5.00e-04 | train loss (augmented) 1.7918 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 18: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7917 - loss: 1.7918 - lr: 5.0000e-04 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 5.0000e-04
+Epoch 19/100
+  epoch  19 | lr 5.00e-04 | train loss (augmented) 1.7972 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 19: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7941 - loss: 1.7972 - lr: 5.0000e-04 - val_loss: 1.7918 - val_ce: 1.7916 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 5.0000e-04
+Epoch 20/100
+  epoch  20 | lr 5.00e-04 | train loss (augmented) 1.7921 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 20: val_loss did not improve from 1.79176
+
+Epoch 20: ReduceLROnPlateau reducing learning rate to 0.0002500000118743628.
+303/303 - 10s - 34ms/step - categorical_ce: 1.7924 - loss: 1.7921 - lr: 5.0000e-04 - val_loss: 1.7918 - val_ce: 1.7921 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 5.0000e-04
+Epoch 21/100
+  epoch  21 | lr 2.50e-04 | train loss (augmented) 1.7921 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 21: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7916 - loss: 1.7921 - lr: 2.5000e-04 - val_loss: 1.7918 - val_ce: 1.7923 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 2.5000e-04
+Epoch 22/100
+  epoch  22 | lr 2.50e-04 | train loss (augmented) 1.7916 | train F 1.7918 acc 0.1077 | val F 1.7918 acc 0.1075 f1_macro 0.0324 kappa 0.0000
+
+Epoch 22: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7921 - loss: 1.7916 - lr: 2.5000e-04 - val_loss: 1.7918 - val_ce: 1.7920 - val_accuracy: 0.1075 - val_f1_macro: 0.0324 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.1077 - learning_rate: 2.5000e-04
+Epoch 23/100
+  epoch  23 | lr 2.50e-04 | train loss (augmented) 1.7922 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 23: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7930 - loss: 1.7922 - lr: 2.5000e-04 - val_loss: 1.7918 - val_ce: 1.7924 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 2.5000e-04
+Epoch 24/100
+  epoch  24 | lr 2.50e-04 | train loss (augmented) 1.7918 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 24: val_loss did not improve from 1.79176
+
+Epoch 24: ReduceLROnPlateau reducing learning rate to 0.0001250000059371814.
+303/303 - 10s - 34ms/step - categorical_ce: 1.7916 - loss: 1.7918 - lr: 2.5000e-04 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 2.5000e-04
+Epoch 25/100
+  epoch  25 | lr 1.25e-04 | train loss (augmented) 1.7957 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 25: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7937 - loss: 1.7957 - lr: 1.2500e-04 - val_loss: 1.7918 - val_ce: 1.7921 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.2500e-04
+Epoch 26/100
+  epoch  26 | lr 1.25e-04 | train loss (augmented) 1.7929 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 26: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7936 - loss: 1.7929 - lr: 1.2500e-04 - val_loss: 1.7918 - val_ce: 1.7922 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.2500e-04
+Epoch 27/100
+  epoch  27 | lr 1.25e-04 | train loss (augmented) 1.7917 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 27: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7918 - loss: 1.7917 - lr: 1.2500e-04 - val_loss: 1.7918 - val_ce: 1.7920 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.2500e-04
+Epoch 28/100
+  epoch  28 | lr 1.25e-04 | train loss (augmented) 1.7918 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 28: val_loss did not improve from 1.79176
+
+Epoch 28: ReduceLROnPlateau reducing learning rate to 6.25000029685907e-05.
+303/303 - 10s - 34ms/step - categorical_ce: 1.7918 - loss: 1.7918 - lr: 1.2500e-04 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.2500e-04
+Epoch 29/100
+  epoch  29 | lr 6.25e-05 | train loss (augmented) 1.7917 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 29: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7918 - loss: 1.7917 - lr: 6.2500e-05 - val_loss: 1.7918 - val_ce: 1.7920 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 6.2500e-05
+Epoch 30/100
+  epoch  30 | lr 6.25e-05 | train loss (augmented) 1.7917 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 30: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7917 - loss: 1.7917 - lr: 6.2500e-05 - val_loss: 1.7918 - val_ce: 1.7918 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 6.2500e-05
+Epoch 31/100
+  epoch  31 | lr 6.25e-05 | train loss (augmented) 1.7920 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 31: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7921 - loss: 1.7920 - lr: 6.2500e-05 - val_loss: 1.7918 - val_ce: 1.7920 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 6.2500e-05
+Epoch 32/100
+  epoch  32 | lr 6.25e-05 | train loss (augmented) 1.7918 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 32: val_loss did not improve from 1.79176
+
+Epoch 32: ReduceLROnPlateau reducing learning rate to 3.125000148429535e-05.
+303/303 - 10s - 33ms/step - categorical_ce: 1.7920 - loss: 1.7918 - lr: 6.2500e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 6.2500e-05
+Epoch 33/100
+  epoch  33 | lr 3.13e-05 | train loss (augmented) 1.7919 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 33: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7918 - loss: 1.7919 - lr: 3.1250e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 3.1250e-05
+Epoch 34/100
+  epoch  34 | lr 3.13e-05 | train loss (augmented) 1.7917 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 34: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7917 - loss: 1.7917 - lr: 3.1250e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 3.1250e-05
+Epoch 35/100
+  epoch  35 | lr 3.13e-05 | train loss (augmented) 1.7919 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 35: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7922 - loss: 1.7919 - lr: 3.1250e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 3.1250e-05
+Epoch 36/100
+  epoch  36 | lr 3.13e-05 | train loss (augmented) 1.7919 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 36: val_loss did not improve from 1.79176
+
+Epoch 36: ReduceLROnPlateau reducing learning rate to 1.5625000742147677e-05.
+303/303 - 10s - 34ms/step - categorical_ce: 1.7919 - loss: 1.7919 - lr: 3.1250e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 3.1250e-05
+Epoch 37/100
+  epoch  37 | lr 1.56e-05 | train loss (augmented) 1.7918 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 37: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7919 - loss: 1.7918 - lr: 1.5625e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.5625e-05
+Epoch 38/100
+  epoch  38 | lr 1.56e-05 | train loss (augmented) 1.7917 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 38: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7918 - loss: 1.7917 - lr: 1.5625e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.5625e-05
+Epoch 39/100
+  epoch  39 | lr 1.56e-05 | train loss (augmented) 1.7917 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 39: val_loss did not improve from 1.79176
+303/303 - 10s - 34ms/step - categorical_ce: 1.7918 - loss: 1.7917 - lr: 1.5625e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.5625e-05
+Epoch 40/100
+  epoch  40 | lr 1.56e-05 | train loss (augmented) 1.7916 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 40: val_loss did not improve from 1.79176
+
+Epoch 40: ReduceLROnPlateau reducing learning rate to 1e-05.
+303/303 - 10s - 33ms/step - categorical_ce: 1.7917 - loss: 1.7916 - lr: 1.5625e-05 - val_loss: 1.7918 - val_ce: 1.7919 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.5625e-05
+Epoch 41/100
+  epoch  41 | lr 1.00e-05 | train loss (augmented) 1.7921 | train F 1.7918 acc 0.0685 | val F 1.7918 acc 0.0686 f1_macro 0.0214 kappa 0.0000
+
+Epoch 41: val_loss did not improve from 1.79176
+303/303 - 10s - 33ms/step - categorical_ce: 1.7919 - loss: 1.7921 - lr: 1.0000e-05 - val_loss: 1.7918 - val_ce: 1.7918 - val_accuracy: 0.0686 - val_f1_macro: 0.0214 - val_kappa: 0.0000e+00 - train_F: 1.7918 - train_accuracy: 0.0685 - learning_rate: 1.0000e-05
+Epoch 41: early stopping
+Restoring model weights from the end of the best epoch: 16.
+
+================ EARLY STOPPING (book NND2 Fig. 13.4) ================
+point a = epoch 16 : minimum validation error F_val = 1.7918 (val macro F1 0.0214)
+point b = epoch 41 : training stopped, F_val = 1.7918
+weights saved to model_Matthew.keras: epoch 16 (best val_loss)
+Early stopping plot saved to /home/ubuntu/DL_ImageClassification/Code/early_stopping_Matthew.png
+
+================ VALIDATION (best saved epoch) ================
+--- without TTA ---
+f1_score macro 0.02140554480980013
+cohen_kappa_score 0.0
+accuracy_score 0.06862339809838776
+Average of Metrics :  0.03000964763606263
+--- with TTA, 4 views: original + flips hv ---
+f1_score macro 0.02140554480980013
+cohen_kappa_score 0.0
+accuracy_score 0.06862339809838776
+Average of Metrics :  0.03000964763606263
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[  0   0   0 224   0   0]
+ [  0   0   0 445   0   0]
+ [  0   0   0 648   0   0]
+ [  0   0   0 166   0   0]
+ [  0   0   0 260   0   0]
+ [  0   0   0 676   0   0]]
+Recall per class: class1 0.00 class2 0.00 class3 0.00 class4 1.00 class5 0.00 class6 0.00
+
+================ TEST ================
+--- without TTA ---
+f1_score macro 0.021419975932611312
+cohen_kappa_score 0.0
+accuracy_score 0.06867283950617284
+Average of Metrics :  0.030030938479594718
+--- with TTA, 4 views: original + flips hv ---
+f1_score macro 0.021419975932611312
+cohen_kappa_score 0.0
+accuracy_score 0.06867283950617284
+Average of Metrics :  0.030030938479594718
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[  0   0   0 240   0   0]
+ [  0   0   0 478   0   0]
+ [  0   0   0 693   0   0]
+ [  0   0   0 178   0   0]
+ [  0   0   0 279   0   0]
+ [  0   0   0 724   0   0]]
+Recall per class: class1 0.00 class2 0.00 class3 0.00 class4 1.00 class5 0.00 class6 0.00
+
+SETTINGS: NORM_MODE=minmax | HIDDEN=[256, 256, 192, 192, 128, 128, 128, 64, 64, 64] | DROPOUT=0.2 | BATCHNORM=False | WEIGHT_DECAY=0.0 | OPTIMIZER=adam | LR=0.001 | LR_SCHEDULE=plateau x0.5 after 4 ep, min 1e-05 | INIT=he_normal | CLIP=1.0 | EPOCHS=100 | EARLY_STOP=val_loss 25/0.0 | SHUFFLE=True | BATCH=32 | IMAGE_SIZE=200 | JPEG_RATIO=8 | ANTIALIAS=True | AUGMENT=flipH flipV rot20 zoom0.1 shift0.1 reflect | CLASS_WEIGHTS=balanced | TTA=4 views | VAL_FRACTION=0.2 | CHECKPOINT=val_loss | SEED=42 | CACHE=memory
+Run logged in /home/ubuntu/DL_ImageClassification/Code/experiments_Matthew.csv (columns updated)
