@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, cohen_kappa_score, accuracy_score, matthews_corrcoef, confusion_matrix
 from tensorflow.keras.utils import to_categorical
 
@@ -32,9 +32,8 @@ Based on train_example.py (LSDR) and train_Matthew.py
             - GRID: every combination of the GRID settings is trained on the same train/validation split and
               ranked by the validation (F1 + kappa)/2 = the leaderboard formula (checked: 10262026 model, local test
               0.4201 vs leaderboard 0.4200). Test numbers are printed but never used to choose.
-            - ENSEMBLE: the best combination is trained FINAL_FOLDS times (k-fold: every fold is the validation set
-              once) -> model_Matthew1..k.keras; test_Matthew.py averages their softmax outputs (Exam1 section 4.8).
-              Out-of-fold predictions give a score on all 12,093 "train" images.
+            - ONE MODEL FILE: the best grid run (best seed of the best combination) is saved as model_Matthew.keras,
+              overwriting the previous file (the exam submission takes a single model file).
             - selection of the best epoch on val (F1 + kappa)/2, stop on the validation error F (book NND2 Ch.13)
 10/26/2026 pm: early stopping as in NND2 Fig. 13.4, LR plateau schedule, class weights, TTA (pixel version)
 10/26/2026: geometric data augmentation (pixel version)
@@ -115,14 +114,9 @@ GRID = {
 }
 ## each combination is trained once per seed and the validation scores are averaged (differences below ~0.01 between
 ## two combinations are within the noise of one seed: use 2-3 seeds to separate close ones)
+## Final model: the run with the best validation score among the seeds of the best combination is saved as
+## model_<NICKNAME>.keras (one file, the previous one is overwritten)
 GRID_SEEDS = [42]
-
-## ---- Final model(s) ------------------------------------------------------------------------------------------
-## FINAL_FOLDS >= 2: the best grid combination is trained FINAL_FOLDS times (stratified k-fold over all "train" rows)
-##                   -> model_<NICKNAME>1.keras ... model_<NICKNAME>k.keras (averaged by test_<NICKNAME>.py)
-## FINAL_FOLDS = 0  : the best grid run itself is saved as model_<NICKNAME>.keras
-## Older model files in this folder are renamed to *.keras.old first, so test_<NICKNAME>.py never mixes them in.
-FINAL_FOLDS = 5
 
 #==================================================================================================================
 
@@ -413,8 +407,6 @@ def check_settings():
         raise ValueError("OPTIMIZER must be 'adam', 'rmsprop' or 'sgd'")
     if not 0.0 < VAL_FRACTION < 1.0:
         raise ValueError('VAL_FRACTION must be in (0, 1)')
-    if FINAL_FOLDS == 1 or FINAL_FOLDS < 0:
-        raise ValueError('FINAL_FOLDS must be 0 (single model) or >= 2 (k-fold ensemble)')
     if EARLY_STOP_PATIENCE > 0 and LR_SCHEDULE == 'plateau' and LR_PATIENCE >= EARLY_STOP_PATIENCE:
         print('WARNING: LR_PATIENCE >= EARLY_STOP_PATIENCE, the training stops before the learning rate is lowered')
     for cfg in grid_configs():
@@ -902,19 +894,6 @@ def experiment_row(stage, cfg, info, test, seed, extra=None):
     return row
 #------------------------------------------------------------------------------------------------------------------
 
-def retire_old_models():
-    '''
-        renames model_<NICKNAME>.keras and model_<NICKNAME><k>.keras in this folder to *.keras.old
-        (test_<NICKNAME>.py loads every model_<NICKNAME>*.keras it finds)
-    '''
-    prefix = 'model_{}'.format(NICKNAME)
-    for name in sorted(os.listdir(OUT_DIR)):
-        middle = name[len(prefix):-len('.keras')] if name.startswith(prefix) and name.endswith('.keras') else None
-        if middle is not None and (middle == '' or middle.isdigit()):
-            os.replace(out_file(name), out_file(name + '.old'))
-            print('  previous model renamed:', name, '->', name + '.old')
-#------------------------------------------------------------------------------------------------------------------
-
 def main():
     global xdf_data, class_names, OUTPUTS_a, xdf_dset, PATH, DATA_DIR
 
@@ -929,7 +908,7 @@ def main():
     configs = grid_configs()
     print('Grid: {} combinations x {} seed(s) = {} runs, then {}'.format(
         len(configs), len(GRID_SEEDS), len(configs) * len(GRID_SEEDS),
-        '{}-fold ensemble'.format(FINAL_FOLDS) if FINAL_FOLDS >= 2 else 'the best run is saved'))
+        'the best run is saved as model_{}.keras'.format(NICKNAME)))
 
     FILE_NAME = find_excel()
     xdf_data = pd.read_excel(FILE_NAME)
@@ -1009,59 +988,28 @@ def main():
     Xb = X_all[:, cols]
 
     #--------------------------------------------------------------------------------------------------------------
-    # FINAL MODEL(S)
-    print('\n================ FINAL MODEL(S) ================')
-    retire_old_models()
+    # FINAL MODEL: the best grid run (best seed of the best combination), ONE file, overwrites the previous one
+    print('\n================ FINAL MODEL ================')
+    model_file = out_file('model_{}.keras'.format(NICKNAME))
+    best['model'].save(model_file)
+    print('Saved {} ({:.0f} MB): combination {}, seed {}, best epoch {}, val score {:.4f}'.format(
+        os.path.basename(model_file), os.path.getsize(model_file) / 1e6, best['combination'], best['seed'],
+        best['info']['best_epoch'], best['info']['val']['score']))
 
-    if FINAL_FOLDS >= 2:
-        skf = StratifiedKFold(n_splits=FINAL_FOLDS, shuffle=True, random_state=SEED)
-        oof = np.zeros((len(idx_train), OUTPUTS_a), np.float32)
-        test_prob = np.zeros((len(idx_test), OUTPUTS_a), np.float32)
-        model_files = []
-        for k, (tr, va) in enumerate(skf.split(idx_train, y_all[idx_train])):
-            i_tr, i_va = idx_train[tr], idx_train[va]
-            model, history, info = train_one(best_cfg, Xb[i_tr], y_all[i_tr], Xb[i_va], y_all[i_va], SEED + k,
-                                             label='[fold {}/{}]'.format(k + 1, FINAL_FOLDS))
-            oof[va] = predict_np(model, Xb[i_va])
-            p_test = predict_np(model, Xb[idx_test])
-            test_prob += p_test / FINAL_FOLDS
-            test = scores(y_all[idx_test], np.argmax(p_test, axis=1))
-            print('  fold {} model alone on test: score {:.4f}'.format(k + 1, test['score']))
-            log_experiment(experiment_row('fold', best_cfg, info, test, SEED + k, {'fold': k + 1}))
-            file_name = out_file('model_{}{}.keras'.format(NICKNAME, k + 1))
-            model.save(file_name)
-            model_files.append(file_name)
-
-        oof_s = scores(y_all[idx_train], np.argmax(oof, axis=1))
-        print('\nOut-of-fold (every "train" image predicted by the model that did not train on it, {} images): '
-              'f1 {:.4f} kappa {:.4f} acc {:.4f} score {:.4f}'.format(len(idx_train), oof_s['f1_macro'],
-                                                                     oof_s['kappa'], oof_s['acc'], oof_s['score']))
-        final_info = {'epochs_run': '', 'best_epoch': '', 'final_lr': '', 'train_accuracy': '', 'val': oof_s}
-    else:
-        file_name = out_file('model_{}.keras'.format(NICKNAME))
-        best['model'].save(file_name)
-        model_files = [file_name]
-        test_prob = predict_np(best['model'], Xb[idx_test])
-        final_info = best['info']
-
-    sizes = sum(os.path.getsize(f) for f in model_files) / 1e6
-    print('Saved {} model file(s), {:.0f} MB in total: {}'.format(len(model_files), sizes,
-                                                                  ', '.join(os.path.basename(f) for f in model_files)))
-
-    # summary from the first SAVED model, as test_Matthew.py writes it
-    save_model(tf.keras.models.load_model(model_files[0]))
+    # summary from the SAVED model, as test_Matthew.py writes it
+    saved_model = tf.keras.models.load_model(model_file)
+    save_model(saved_model)
 
     #--------------------------------------------------------------------------------------------------------------
-    # TEST: same averaging as test_Matthew.py -> results_<NICKNAME>.xlsx
-    print('\n================ TEST ({}) ================'.format(
-        'ensemble of {} models'.format(len(model_files)) if len(model_files) > 1 else 'single model'))
+    # TEST: predictions of the saved model, as test_Matthew.py computes them -> results_<NICKNAME>.xlsx
+    print('\n================ TEST ================')
+    test_prob = predict_np(saved_model, Xb[idx_test])
     xdf_dset = xdf_data.iloc[idx_test].copy()
     predict_func(np.argmax(test_prob, axis=1))
     values = metrics_func(['f1_macro', 'coh', 'acc'], ['avg'])
     final_test = scores(y_all[idx_test], np.argmax(test_prob, axis=1))
     print('Leaderboard formula (F1 + kappa)/2 on test: {:.4f}'.format(final_test['score']))
-    log_experiment(experiment_row('final', best_cfg, final_info, final_test, SEED,
-                                  {'fold': 'ensemble {}'.format(len(model_files)) if len(model_files) > 1 else ''}))
+    log_experiment(experiment_row('final', best_cfg, best['info'], final_test, best['seed']))
     print('Run logged in', out_file('experiments_{}.csv'.format(NICKNAME)), 'and', out_file('grid_{}.csv'.format(NICKNAME)))
     return values
 # ------------------------------------------------------------------------------------------------------------------
