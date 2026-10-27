@@ -14,8 +14,6 @@ from tensorflow.keras.utils import to_categorical
 
 '''
 Based on train_example.py (LSDR) and train_Matthew.py
-10/27/2026: wider network (neurons of every hidden layer doubled, ~31M parameters), BatchNorm OFF, Dropout 0.2 after
-            every hidden layer. The input normalization (minmax, first layer of the model) is unchanged.
 10/26/2026 pm: generalization (book NND2 Ch.13 "Methods for Improving Generalization", Early Stopping, Fig. 13.4)
             - EARLY STOPPING as in the book: the validation error F (the same cross-entropy the network is trained on)
               decides when to stop AND which weights are kept. Point "a" = epoch with the minimum validation error;
@@ -75,14 +73,12 @@ NORM_MODE = 'minmax'
 ## Deeper and narrower: a Dense layer has S(m-1)*S(m) + S(m) parameters, so widening layers multiplies the count,
 ## while adding one more narrow layer only adds S^2 + S. The first layer (120,000 inputs x S1) dominates the total.
 ## [128, 128, 96, 96, 64, 64, 64, 32, 32, 32]: 10 hidden layers, ~15.4M parameters (vs 6 layers / 36.1M before)
-## 10/27/2026: neurons of every layer doubled -> [256, 256, 192, 192, 128, 128, 128, 64, 64, 64], ~31M parameters
-HIDDEN_LAYERS = [256, 256, 192, 192, 128, 128, 128, 64, 64, 64]   # neurons of each hidden Dense layer
+HIDDEN_LAYERS = [128, 128, 96, 96, 64, 64, 64, 32, 32, 32]   # neurons of each hidden Dense layer
 ACTIVATION = 'relu'
 
 ## ---- Regularization (set to 0 / False to switch off) -----------------------------------------------------------
 DROPOUT_RATE = 0.2       # e.g. 0.2 - 0.5 ; used ONLY when USE_BATCHNORM = False (BatchNorm and Dropout are not combined)
-USE_BATCHNORM = False    # True -> Dense -> BatchNorm -> activation (-> Dropout).  KEEP True with Adam alpha=0.001 (see Stability)
-                         # 10/27/2026: False -> Dense (with bias) -> activation -> Dropout(DROPOUT_RATE)
+USE_BATCHNORM = True     # True -> Dense -> BatchNorm -> activation (-> Dropout).  KEEP True with Adam alpha=0.001 (see Stability)
 WEIGHT_DECAY = 0.0       # e.g. 1e-4 ; L2 penalty  alpha * sum(w^2)  added to the loss for every Dense kernel
 
 ## ---- Training --------------------------------------------------------------------------------------------------
