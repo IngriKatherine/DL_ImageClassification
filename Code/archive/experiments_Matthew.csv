@@ -1,2 +1,0 @@
-date,norm,hidden,dropout,batchnorm,weight_decay,optimizer,lr,init,clip,shuffle,patience,epochs_run,best_epoch,batch,image_size,jpeg_ratio,antialias,monitor,seed,val_f1_macro,val_kappa,val_acc,test_f1_macro,test_kappa,test_acc
-2026-10-25 18:34,minmax,"[128, 128, 96, 96, 64, 64, 64, 32, 32, 32]",0.0,True,0.0,adam,0.001,he_normal,1.0,True,10,17,7,32,200,8,True,val_f1_macro,42,0.4971442939731945,0.3517963116447651,0.48449772633319554,0.49164255017570363,0.3486076350269346,0.4826388888888889
