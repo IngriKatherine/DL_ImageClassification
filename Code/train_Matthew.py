@@ -19,6 +19,17 @@ from tensorflow.keras.utils import to_categorical
 
 '''
 Based on train_example.py (LSDR) and train_Matthew.py
+10/30/2026 night: CLASS1 FEATURES (10/30 evening run: out-of-fold 0.884, test 0.883; class1 F1 0.78)
+            Looking at the images: class1 leaves carry SEVERAL lesion types at once (frog-eye spots + scab blotches
+            or rust spots); class5 (rust) photos mostly come from other cameras (16 of 20 test images are not
+            4000x2672, against 0 of 20 for classes 2, 3, 4).
+            - NEW GROUP 'blob' (90, FEATURE_VERSION 4): difference-of-Gaussians spot detector (Lindeberg, 1998) on the
+              Lab channels at 3 spot sizes: how much / how many light, dark, red-brown and yellow-orange spots.
+            - NEW GROUP 'meta' (5): image size, aspect ratio and JPEG bytes per pixel, read from the file header
+              (dataset/camera information, not leaf content; computed once per image, ~1 min).
+            - Back to N_AUG_VIEWS = 4 (8 views did not help on 10/30 evening). 'blob' is computed at ratio 8 only;
+              the ratio-4 combinations reuse the cached ratio-4 features (+ 'meta').
+            - Packs not used by any grid combination are no longer computed or loaded.
 10/30/2026 evening: PUSH TOWARDS 0.9 (10/30 pm run: test 0.883; class1 F1 0.80 vs 0.90-0.93 for the others)
             1. EARLY STOPPING on the validation score (patience 20) instead of the validation loss: in the 10/30 pm run
                the loss was lowest at epoch 23 while the score still improved until epoch 51.
@@ -106,8 +117,10 @@ NICKNAME = 'Matthew'
 ##  'lab' CIE L*a*b* histograms (272)               'tile' max over 4x4 tiles of hs + exr + lbp histograms (403)
 ## 240-image test: all groups but 'thumb' was the best set (thumbnail = raw pixels again, it lowered the score)
 FEATURES_V1 = ['hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr']      # the 10/30 set (904 features)
-FEATURE_GROUPS = FEATURES_V1 + ['lab', 'tile', 'spread']
+FEATURE_GROUPS = FEATURES_V1 + ['spread', 'blob', 'meta']
 ##  'spread' how widely each of 48 Lab colour words spreads over 6x6 tiles + number of colours (98)
+##  'blob' spot detector: light / dark / red / yellow spots at 3 sizes (90)
+##  'meta' image size, aspect ratio, JPEG bytes per pixel from the file header (5)
 FEATURE_RATIO = 8            # JPEG decoded at 1/8 size (500x334); 4 = 1000x668, about 3x slower. Grid setting too
 EXTRACT_PARALLEL = 0         # images processed at the same time: 0 = automatic (all CPU cores), n = n images
 EXTRACT_BATCH = 64
@@ -161,7 +174,7 @@ PRINT_EVERY = 10                   # print one line every PRINT_EVERY epochs (an
 ## N_AUG_VIEWS x 4 min). Each view: random crop of AUG_SCALE of the height and of the width at a random position, then
 ## a small random change of brightness, contrast and saturation (no hue change: colour is the main signal). The same
 ## image always gets the same views (seeded by its name), so the cache stays valid. 0 = no augmentation.
-N_AUG_VIEWS = 8
+N_AUG_VIEWS = 4
 AUG_SEED = 2026
 AUG_SCALE = (0.6, 1.0)
 AUG_BRIGHTNESS = 0.08        # random value in [-0.08, 0.08] added to the pixels (0..1)
@@ -190,26 +203,19 @@ TTA_VIEWS = 5
 ##   train and validation both low and close   -> too simple / too regularized: wider, deeper, less dropout
 ##   train much higher than validation (>0.15) -> overfitting: more dropout / weight decay, or smaller
 GRID = [
-    ## reference: the 10/30 pm winner (validation with TTA 0.868), only the early stopping is new
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile'], N_AUG_VIEWS=4, MIXUP_ALPHA=0.0,
-         LABEL_SMOOTHING=0.0),
-    ## + 8 augmented views
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile'], N_AUG_VIEWS=8, MIXUP_ALPHA=0.0,
-         LABEL_SMOOTHING=0.0),
-    ## + mixup and label smoothing
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile'], N_AUG_VIEWS=8, MIXUP_ALPHA=0.2,
-         LABEL_SMOOTHING=0.1),
-    ## + 'spread'
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread'], N_AUG_VIEWS=8, MIXUP_ALPHA=0.2,
-         LABEL_SMOOTHING=0.1),
-    ## a different feature set (diversity for the ensemble)
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread'], N_AUG_VIEWS=8, MIXUP_ALPHA=0.2,
-         LABEL_SMOOTHING=0.1),
-    ## higher resolution (ratio 4: ~1.7 h of feature extraction the first time, fewer augmented views to save time)
-    dict(FEATURE_RATIO=4, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread'], N_AUG_VIEWS=2, MIXUP_ALPHA=0.2,
-         LABEL_SMOOTHING=0.1),
-    dict(FEATURE_RATIO=4, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile'], N_AUG_VIEWS=2, MIXUP_ALPHA=0.2,
-         LABEL_SMOOTHING=0.1),
+    ## reference: the best 10/30 evening combination (validation with TTA 0.881, there with 8 augmented views)
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread'], N_AUG_VIEWS=4),
+    ## + image size / camera information
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'meta'], N_AUG_VIEWS=4),
+    ## + spot detector
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'blob'], N_AUG_VIEWS=4),
+    ## + both
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'blob', 'meta'], N_AUG_VIEWS=4),
+    ## everything (another feature set for the ensemble)
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread', 'blob', 'meta'], N_AUG_VIEWS=4),
+    ## ratio 4 (features already cached by the 10/30 evening run, + 'meta')
+    dict(FEATURE_RATIO=4, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread', 'meta'], N_AUG_VIEWS=2),
+    dict(FEATURE_RATIO=4, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'meta'], N_AUG_VIEWS=2),
 ]
 ## each combination is trained once per seed and the validation scores are averaged (differences below ~0.01 between
 ## two combinations are within the noise of one seed: use 2-3 seeds to separate close ones)
@@ -266,17 +272,23 @@ def out_file(name):
 ## Histograms are square-rooted (Hellinger / power normalization: rare lesion colours and textures count more).
 ## LBP codes are grouped into the 51 classes that stay the same when the leaf is flipped or turned by 90 degrees.
 ## Version 2 (10/30/2026): new groups 'lab' and 'tile', test-time crops TTA_CROPS.
-## Version 3 (10/30/2026 pm): new group 'spread'. The groups of older versions are computed exactly as before, so
-## models of every version in FEATURE_VERSIONS_OK are accepted.
+## Version 3 (10/30/2026 pm): new group 'spread'.
+## Version 4 (10/30/2026 evening): new groups 'blob' (spot detector) and 'meta' (image file size / shape, read from the
+## JPEG header, the same for every view of an image: see file_meta). The groups of older versions are computed exactly
+## as before, so models of every version in FEATURE_VERSIONS_OK are accepted.
 ## Change FEATURE_VERSION whenever this block changes: test_Matthew.py refuses a model made with another version.
-FEATURE_VERSION = 3
-FEATURE_VERSIONS_OK = (1, 2, 3)
-FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile', 'spread')
+FEATURE_VERSION = 4
+FEATURE_VERSIONS_OK = (1, 2, 3, 4)
+FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile', 'spread',
+                 'blob', 'meta')
 FEATURE_SIZE = {'hs': 288, 'v': 16, 'mom': 12, 'exr': 64, 'lbp': 51, 'lbp2': 51, 'lbp4': 51, 'grad': 16,
-                'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403, 'spread': 98}
+                'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403, 'spread': 98, 'blob': 90, 'meta': 5}
 SQRT_GROUPS = ('hs', 'v', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'lab', 'tile')
 TILE_GRID = 4                # 'tile': the image is cut into TILE_GRID x TILE_GRID tiles
 SPREAD_GRID = 6              # 'spread': 6 x 6 tiles
+## 'blob': spot sizes (blur factors) and, per Lab channel, the 3 contrast thresholds (L* units / a*, b* units)
+BLOB_SCALES = (2, 4, 8)
+BLOB_THRESHOLDS = {'L': (4.0, 8.0, 16.0), 'a': (3.0, 6.0, 12.0), 'b': (3.0, 6.0, 12.0)}
 ## Test-time augmentation views: (crop scale, vertical position, horizontal position), position 0 = top / left,
 ## 1 = bottom / right. View 0 is the whole image; the model name says how many views are used (..._t5).
 TTA_CROPS = ((1.0, 0.5, 0.5), (0.8, 0.0, 0.0), (0.8, 0.0, 1.0), (0.8, 1.0, 0.0), (0.8, 1.0, 1.0))
@@ -414,6 +426,58 @@ def _lab_words(img):
     return lc * 16 + ac * 4 + bc
 
 
+def _blur_pyramid(x, factors):
+    '''
+        x [H, W] smoothed at every scale f of factors: average over f x f blocks, then bilinear back to [H, W]
+        (H, W are first cut to a multiple of the largest factor so every scale has the same size)
+    '''
+    m = max(factors)
+    h, w = (tf.shape(x)[0] // m) * m, (tf.shape(x)[1] // m) * m
+    x = x[:h, :w][None, ..., None]
+    return x[0, ..., 0], {f: tf.image.resize(tf.nn.avg_pool2d(x, f, f, 'VALID'), [h, w], method='bilinear')[0, ..., 0]
+                          for f in factors}
+
+
+def _blob_features(img):
+    '''
+        SPOT DETECTOR (difference of Gaussians, Lindeberg 1998) on the Lab channels L* (light / dark), a* (red-brown /
+        green) and b* (yellow-orange / blue): response = blur(scale s) - blur(scale 2s) for s in BLOB_SCALES, i.e. a
+        spot about s pixels wide that is lighter (+) or darker (-) / redder / yellower than its surroundings.
+        For each channel x scale x sign (18 maps): the fraction of pixels above the 3 thresholds of the channel and
+        the fraction of (2s x 2s) blocks holding a response above the 2 largest thresholds (spot density) -> 90
+        A leaf with frog-eye spots + scab blotches gets non-zero values in several channels / scales at once.
+    '''
+    lab_l, lab_a, lab_b = _rgb_to_lab(img)
+    out = []
+    for name, ch in (('L', lab_l), ('a', lab_a), ('b', lab_b)):
+        t1, t2, t3 = BLOB_THRESHOLDS[name]
+        ch, blur = _blur_pyramid(ch, sorted(set(BLOB_SCALES) | {2 * s for s in BLOB_SCALES}))
+        for s in BLOB_SCALES:
+            dog = blur[s] - blur[2 * s]
+            for r in (dog, -dog):
+                out += [tf.reduce_mean(tf.cast(r > t, tf.float32)) for t in (t1, t2, t3)]
+                # spot density: fraction of the (2s x 2s) blocks that contain a response above the threshold
+                hb, wb = tf.shape(r)[0] // (2 * s), tf.shape(r)[1] // (2 * s)
+                blocks = tf.reshape(r, [hb, 2 * s, wb, 2 * s])
+                peak = tf.reduce_max(blocks, axis=[1, 3])                  # strongest response of every block
+                out += [tf.reduce_mean(tf.cast(peak > t, tf.float32)) for t in (t2, t3)]
+    return tf.sqrt(tf.stack(out))
+
+
+def file_meta(file_path):
+    '''
+        'meta' (5): long side / 4000, short side / 4000, aspect ratio, JPEG bytes per pixel, 1 if 4000 x 2672.
+        Read from the file header without decoding (the photos come from several cameras, and the camera is not
+        independent of the class). Identical for every view (crop) of an image.
+    '''
+    raw = tf.io.read_file(file_path)
+    shape = tf.cast(tf.io.extract_jpeg_shape(raw), tf.float32)
+    big, small = tf.maximum(shape[0], shape[1]), tf.minimum(shape[0], shape[1])
+    n_bytes = tf.cast(tf.strings.length(raw), tf.float32)
+    usual = tf.cast(tf.logical_and(tf.equal(big, 4000.0), tf.equal(small, 2672.0)), tf.float32)
+    return tf.stack([big / 4000.0, small / 4000.0, big / small, n_bytes / (big * small), usual])
+
+
 def decode_image(file_path, ratio):
     '''
         reads a JPEG and decodes it directly at 1/ratio of its size (4000x2672 -> 500x334 with ratio 8)
@@ -441,8 +505,8 @@ def tta_crop(img, view):
 def image_features(img, groups):
     '''
         img    : [H, W, 3] float32 in [0, 1] (from decode_image)
-        groups : names from FEATURE_ORDER, already sorted with sort_feature_groups
-        returns a 1-D float32 vector (length = sum of FEATURE_SIZE of the groups)
+        groups : names from FEATURE_ORDER, already sorted with sort_feature_groups ('meta' is skipped: file_meta)
+        returns a 1-D float32 vector (length = sum of FEATURE_SIZE of the groups except 'meta')
     '''
     out = {}
     need = set(groups)
@@ -519,6 +583,10 @@ def image_features(img, groups):
         n_words = tf.reduce_mean(tf.cast(p >= 0.005, tf.float32))
         out['spread'] = tf.concat([present, tf.sqrt(p), tf.stack([entropy, n_words])], 0)
 
+    if 'blob' in need:
+        out['blob'] = _blob_features(img)
+
+    groups = [k for k in groups if k != 'meta']          # 'meta' comes from the file (file_meta), not the image
     return tf.concat([tf.sqrt(out[k]) if k in SQRT_GROUPS else out[k] for k in groups], axis=0)
 #------------------------------------------------------------------------------------------------------------------
 
@@ -581,13 +649,40 @@ def extract_features(paths, seeds, groups, ratio, view):
 #------------------------------------------------------------------------------------------------------------------
 
 ## the cache is stored in packs: the groups of FEATURE_VERSION 2 (file names as in the 10/30 pm run, so those files are
-## reused) and the group added in version 3. Packs are concatenated in FEATURE_ORDER.
+## reused), the group added in version 3, the one added in version 4, and 'meta' (one file for every view and ratio:
+## it depends only on the image file). Packs are concatenated in FEATURE_ORDER.
 FEATURE_PACKS = (('v2', ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile')),
-                 ('v3', ('spread',)))
+                 ('v3', ('spread',)), ('v4', ('blob',)), ('meta', ('meta',)))
 assert tuple(g for _, gs in FEATURE_PACKS for g in gs) == FEATURE_ORDER
 
 
-def load_feature_cache(ids, view='orig', ratio=None):
+def load_meta_cache(ids):
+    '''
+        'meta' of the image ids (same for every view and decode ratio), cached in features_cache/features_meta.npz
+    '''
+    folder = os.path.join(SCRIPT_DIR, CACHE_DIR)
+    os.makedirs(folder, exist_ok=True)
+    file_name = os.path.join(folder, 'features_meta.npz')
+    cached_ids, cached_X = np.array([], dtype=object), np.zeros((0, FEATURE_SIZE['meta']), np.float32)
+    if os.path.exists(file_name):
+        z = np.load(file_name, allow_pickle=True)
+        if z['X'].shape[1] == FEATURE_SIZE['meta']:
+            cached_ids, cached_X = z['ids'], z['X']
+    position = {k: i for i, k in enumerate(cached_ids)}
+    missing = [i for i in dict.fromkeys(ids) if i not in position]
+    if missing:
+        print('Reading the image size / file size of {} images (meta) ...'.format(len(missing)))
+        ds = tf.data.Dataset.from_tensor_slices([DATA_DIR + i for i in missing]).map(
+            file_meta, num_parallel_calls=AUTOTUNE, deterministic=True).batch(256)
+        X_new = np.concatenate([xb.numpy() for xb in ds], axis=0).astype(np.float32)
+        cached_ids = np.concatenate([cached_ids, np.array(missing, dtype=object)])
+        cached_X = np.concatenate([cached_X, X_new], axis=0)
+        np.savez(file_name, ids=cached_ids, X=cached_X)
+        position = {k: i for i, k in enumerate(cached_ids)}
+    return cached_X[[position[i] for i in ids]]
+#------------------------------------------------------------------------------------------------------------------
+
+def load_feature_cache(ids, view='orig', ratio=None, groups=None):
     '''
         features of ALL groups (FEATURE_ORDER) of one view of the image ids, from features_cache/ when available.
         Only the images missing from the cache are computed (packs missing for the same images in one pass).
@@ -596,8 +691,11 @@ def load_feature_cache(ids, view='orig', ratio=None):
                    changing them makes new views instead of reusing old ones
           'tta<j>' test-time crop j (all rows: validation with TTA in the grid / folds, test rows)
         ratio: JPEG decode ratio (default FEATURE_RATIO)
+        groups: only the packs holding one of these groups are loaded / computed (default: all); the columns of the
+                other packs are left at 0
         Returns [len(ids), sum of all FEATURE_SIZE]
     '''
+    needed = set(FEATURE_ORDER if groups is None else groups)
     ratio = FEATURE_RATIO if ratio is None else ratio
     folder = os.path.join(SCRIPT_DIR, CACHE_DIR)
     os.makedirs(folder, exist_ok=True)
@@ -609,6 +707,9 @@ def load_feature_cache(ids, view='orig', ratio=None):
 
     packs = []
     for pack, groups in FEATURE_PACKS:
+        if pack == 'meta' or not needed & set(groups):
+            packs.append({'name': pack, 'groups': groups, 'skip': True, 'missing': []})
+            continue
         file_name = os.path.join(folder, 'features_r{}_{}_{}.npz'.format(ratio, pack, tag))
         n = sum(FEATURE_SIZE[g] for g in groups)
         cached_ids, cached_X = np.array([], dtype=object), np.zeros((0, n), np.float32)
@@ -619,8 +720,8 @@ def load_feature_cache(ids, view='orig', ratio=None):
             else:
                 print('Feature cache {} has another layout, it is recomputed'.format(file_name))
         position = {k: i for i, k in enumerate(cached_ids)}
-        packs.append({'file': file_name, 'groups': groups, 'ids': cached_ids, 'X': cached_X, 'position': position,
-                      'missing': [i for i in unique_ids if i not in position]})
+        packs.append({'name': pack, 'file': file_name, 'groups': groups, 'ids': cached_ids, 'X': cached_X,
+                      'position': position, 'missing': [i for i in unique_ids if i not in position], 'skip': False})
 
     ## packs missing the same images are computed together (one JPEG decode)
     todo = {}
@@ -650,7 +751,15 @@ def load_feature_cache(ids, view='orig', ratio=None):
     if not todo:
         print('Features loaded: ratio {}, view {}'.format(ratio, view))
 
-    return np.concatenate([pk['X'][[pk['position'][i] for i in ids]] for pk in packs], axis=1)
+    parts = []
+    for pk in packs:
+        if pk['name'] == 'meta' and 'meta' in needed:
+            parts.append(load_meta_cache(ids))
+        elif pk['skip']:
+            parts.append(np.zeros((len(ids), sum(FEATURE_SIZE[g] for g in pk['groups'])), np.float32))
+        else:
+            parts.append(pk['X'][[pk['position'][i] for i in ids]])
+    return np.concatenate(parts, axis=1)
 #------------------------------------------------------------------------------------------------------------------
 
 def feature_columns(groups):
@@ -1397,10 +1506,11 @@ def main():
         n_aug = max(int(c['N_AUG_VIEWS']) for c in cfgs)
         print('\n==== Features, ratio {}: groups {} ({} values), {} augmented view(s), {} TTA view(s) ===='.format(
             ratio, '-'.join(used), len(keep), n_aug, TTA_VIEWS))
-        X_all = load_feature_cache(ids, 'orig', ratio)[:, keep]
-        train = [X_all[idx_train]] + [load_feature_cache(train_ids, 'aug{}'.format(j), ratio)[:, keep]
+        X_all = load_feature_cache(ids, 'orig', ratio, used)[:, keep]
+        train = [X_all[idx_train]] + [load_feature_cache(train_ids, 'aug{}'.format(j), ratio, used)[:, keep]
                                       for j in range(1, n_aug + 1)]
-        tta = [X_all] + [load_feature_cache(ids, 'tta{}'.format(j), ratio)[:, keep] for j in range(1, TTA_VIEWS)]
+        tta = [X_all] + [load_feature_cache(ids, 'tta{}'.format(j), ratio, used)[:, keep]
+                         for j in range(1, TTA_VIEWS)]
         data[ratio] = {'cols': keep, 'train': np.stack(train), 'train_tta': np.stack([t[idx_train] for t in tta]),
                        'test': np.stack([t[idx_test] for t in tta])}
         del X_all, train, tta

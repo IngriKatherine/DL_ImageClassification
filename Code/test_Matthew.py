@@ -79,17 +79,23 @@ def test():
     ## Histograms are square-rooted (Hellinger / power normalization: rare lesion colours and textures count more).
     ## LBP codes are grouped into the 51 classes that stay the same when the leaf is flipped or turned by 90 degrees.
     ## Version 2 (10/30/2026): new groups 'lab' and 'tile', test-time crops TTA_CROPS.
-    ## Version 3 (10/30/2026 pm): new group 'spread'. The groups of older versions are computed exactly as before, so
-    ## models of every version in FEATURE_VERSIONS_OK are accepted.
+    ## Version 3 (10/30/2026 pm): new group 'spread'.
+    ## Version 4 (10/30/2026 evening): new groups 'blob' (spot detector) and 'meta' (image file size / shape, read from the
+    ## JPEG header, the same for every view of an image: see file_meta). The groups of older versions are computed exactly
+    ## as before, so models of every version in FEATURE_VERSIONS_OK are accepted.
     ## Change FEATURE_VERSION whenever this block changes: test_Matthew.py refuses a model made with another version.
-    FEATURE_VERSION = 3
-    FEATURE_VERSIONS_OK = (1, 2, 3)
-    FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile', 'spread')
+    FEATURE_VERSION = 4
+    FEATURE_VERSIONS_OK = (1, 2, 3, 4)
+    FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile', 'spread',
+                     'blob', 'meta')
     FEATURE_SIZE = {'hs': 288, 'v': 16, 'mom': 12, 'exr': 64, 'lbp': 51, 'lbp2': 51, 'lbp4': 51, 'grad': 16,
-                    'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403, 'spread': 98}
+                    'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403, 'spread': 98, 'blob': 90, 'meta': 5}
     SQRT_GROUPS = ('hs', 'v', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'lab', 'tile')
     TILE_GRID = 4                # 'tile': the image is cut into TILE_GRID x TILE_GRID tiles
     SPREAD_GRID = 6              # 'spread': 6 x 6 tiles
+    ## 'blob': spot sizes (blur factors) and, per Lab channel, the 3 contrast thresholds (L* units / a*, b* units)
+    BLOB_SCALES = (2, 4, 8)
+    BLOB_THRESHOLDS = {'L': (4.0, 8.0, 16.0), 'a': (3.0, 6.0, 12.0), 'b': (3.0, 6.0, 12.0)}
     ## Test-time augmentation views: (crop scale, vertical position, horizontal position), position 0 = top / left,
     ## 1 = bottom / right. View 0 is the whole image; the model name says how many views are used (..._t5).
     TTA_CROPS = ((1.0, 0.5, 0.5), (0.8, 0.0, 0.0), (0.8, 0.0, 1.0), (0.8, 1.0, 0.0), (0.8, 1.0, 1.0))
@@ -227,6 +233,58 @@ def test():
         return lc * 16 + ac * 4 + bc
 
 
+    def _blur_pyramid(x, factors):
+        '''
+            x [H, W] smoothed at every scale f of factors: average over f x f blocks, then bilinear back to [H, W]
+            (H, W are first cut to a multiple of the largest factor so every scale has the same size)
+        '''
+        m = max(factors)
+        h, w = (tf.shape(x)[0] // m) * m, (tf.shape(x)[1] // m) * m
+        x = x[:h, :w][None, ..., None]
+        return x[0, ..., 0], {f: tf.image.resize(tf.nn.avg_pool2d(x, f, f, 'VALID'), [h, w], method='bilinear')[0, ..., 0]
+                              for f in factors}
+
+
+    def _blob_features(img):
+        '''
+            SPOT DETECTOR (difference of Gaussians, Lindeberg 1998) on the Lab channels L* (light / dark), a* (red-brown /
+            green) and b* (yellow-orange / blue): response = blur(scale s) - blur(scale 2s) for s in BLOB_SCALES, i.e. a
+            spot about s pixels wide that is lighter (+) or darker (-) / redder / yellower than its surroundings.
+            For each channel x scale x sign (18 maps): the fraction of pixels above the 3 thresholds of the channel and
+            the fraction of (2s x 2s) blocks holding a response above the 2 largest thresholds (spot density) -> 90
+            A leaf with frog-eye spots + scab blotches gets non-zero values in several channels / scales at once.
+        '''
+        lab_l, lab_a, lab_b = _rgb_to_lab(img)
+        out = []
+        for name, ch in (('L', lab_l), ('a', lab_a), ('b', lab_b)):
+            t1, t2, t3 = BLOB_THRESHOLDS[name]
+            ch, blur = _blur_pyramid(ch, sorted(set(BLOB_SCALES) | {2 * s for s in BLOB_SCALES}))
+            for s in BLOB_SCALES:
+                dog = blur[s] - blur[2 * s]
+                for r in (dog, -dog):
+                    out += [tf.reduce_mean(tf.cast(r > t, tf.float32)) for t in (t1, t2, t3)]
+                    # spot density: fraction of the (2s x 2s) blocks that contain a response above the threshold
+                    hb, wb = tf.shape(r)[0] // (2 * s), tf.shape(r)[1] // (2 * s)
+                    blocks = tf.reshape(r, [hb, 2 * s, wb, 2 * s])
+                    peak = tf.reduce_max(blocks, axis=[1, 3])                  # strongest response of every block
+                    out += [tf.reduce_mean(tf.cast(peak > t, tf.float32)) for t in (t2, t3)]
+        return tf.sqrt(tf.stack(out))
+
+
+    def file_meta(file_path):
+        '''
+            'meta' (5): long side / 4000, short side / 4000, aspect ratio, JPEG bytes per pixel, 1 if 4000 x 2672.
+            Read from the file header without decoding (the photos come from several cameras, and the camera is not
+            independent of the class). Identical for every view (crop) of an image.
+        '''
+        raw = tf.io.read_file(file_path)
+        shape = tf.cast(tf.io.extract_jpeg_shape(raw), tf.float32)
+        big, small = tf.maximum(shape[0], shape[1]), tf.minimum(shape[0], shape[1])
+        n_bytes = tf.cast(tf.strings.length(raw), tf.float32)
+        usual = tf.cast(tf.logical_and(tf.equal(big, 4000.0), tf.equal(small, 2672.0)), tf.float32)
+        return tf.stack([big / 4000.0, small / 4000.0, big / small, n_bytes / (big * small), usual])
+
+
     def decode_image(file_path, ratio):
         '''
             reads a JPEG and decodes it directly at 1/ratio of its size (4000x2672 -> 500x334 with ratio 8)
@@ -254,8 +312,8 @@ def test():
     def image_features(img, groups):
         '''
             img    : [H, W, 3] float32 in [0, 1] (from decode_image)
-            groups : names from FEATURE_ORDER, already sorted with sort_feature_groups
-            returns a 1-D float32 vector (length = sum of FEATURE_SIZE of the groups)
+            groups : names from FEATURE_ORDER, already sorted with sort_feature_groups ('meta' is skipped: file_meta)
+            returns a 1-D float32 vector (length = sum of FEATURE_SIZE of the groups except 'meta')
         '''
         out = {}
         need = set(groups)
@@ -332,6 +390,10 @@ def test():
             n_words = tf.reduce_mean(tf.cast(p >= 0.005, tf.float32))
             out['spread'] = tf.concat([present, tf.sqrt(p), tf.stack([entropy, n_words])], 0)
 
+        if 'blob' in need:
+            out['blob'] = _blob_features(img)
+
+        groups = [k for k in groups if k != 'meta']          # 'meta' comes from the file (file_meta), not the image
         return tf.concat([tf.sqrt(out[k]) if k in SQRT_GROUPS else out[k] for k in groups], axis=0)
     #------------------------------------------------------------------------------------------------------------------
 
@@ -460,9 +522,17 @@ def test():
         '''
         key = (ratio, tuple(groups), view)
         if key not in feature_cache:
+            ## 'meta' (last group of FEATURE_ORDER) comes from the file header, the other groups from the image
+            image_groups = [g for g in groups if g != 'meta']
+
+            def one(f):
+                parts = [image_features(tta_crop(decode_image(f, ratio), view), image_groups)] if image_groups else []
+                if 'meta' in groups:
+                    parts.append(file_meta(f))
+                return tf.concat(parts, axis=0)
+
             ds = tf.data.Dataset.from_tensor_slices(ds_inputs)
-            ds = ds.map(lambda f: image_features(tta_crop(decode_image(f, ratio), view), groups),
-                        num_parallel_calls=AUTOTUNE, deterministic=True)
+            ds = ds.map(one, num_parallel_calls=AUTOTUNE, deterministic=True)
             ds = ds.batch(64).prefetch(AUTOTUNE)
             feature_cache[key] = np.concatenate([xb.numpy() for xb in ds], axis=0)
             print('Features computed: {} images x {} values (ratio {}, groups {}, view {})'.format(
