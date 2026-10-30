@@ -37,12 +37,15 @@ def test():
         results_Matthew.xlsx         output: the rows of the chosen split + column "results"
                                      (predicted class index, 0 = class1 ... 5 = class6), same format as train_example.py
 
-        FEATURE models (name like MLP_Matthew_feat_r8_g-hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr_v1, train_Matthew.py of
-        10/27/2026 pm): every image is described by colour and texture histograms computed with image_features()
-        (the FEATURE EXTRACTION block above, identical to train_Matthew.py). The decode ratio (r8), the feature
-        groups (g-...) and the feature version (v1) are read from the model name; a model made with another
-        FEATURE_VERSION is refused. The z-score of the features is the first layer INSIDE the model.
-        The features are computed in parallel on all CPU cores (tf.data).
+        FEATURE models (name like MLP_Matthew_feat_r8_g-hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-lab-tile_v2_t5,
+        train_Matthew.py of 10/27/2026 pm and later): every image is described by colour and texture histograms
+        computed with image_features() (the FEATURE EXTRACTION block above, identical to train_Matthew.py). The decode
+        ratio (r8), the feature groups (g-...), the feature version (v2) and the number of test-time views (t5) are
+        read from the model name; a feature version not in FEATURE_VERSIONS_OK is refused. The z-score of the
+        features is the first layer INSIDE the model. The features are computed in parallel on all CPU cores.
+        Test-time augmentation of feature models: the model predicts the whole image and the crops of TTA_CROPS
+        (t5 = whole image + 4 corner crops of 80%), and its log-probabilities are averaged over the views. Names
+        without _t (older models) use the whole image only.
 
         PIXEL models (older, name like MLP_Matthew_flip_hv_prep_r8_aa):
         Image preparation is identical to train_Matthew.py, and is read from each model, so it can never mismatch:
@@ -73,12 +76,19 @@ def test():
     ## it is on the leaf. Groups are always computed and concatenated in the order of FEATURE_ORDER.
     ## Histograms are square-rooted (Hellinger / power normalization: rare lesion colours and textures count more).
     ## LBP codes are grouped into the 51 classes that stay the same when the leaf is flipped or turned by 90 degrees.
+    ## Version 2 (10/30/2026): new groups 'lab' and 'tile', test-time crops TTA_CROPS. The version 1 groups are computed
+    ## exactly as in version 1, so models of both versions are accepted (FEATURE_VERSIONS_OK).
     ## Change FEATURE_VERSION whenever this block changes: test_Matthew.py refuses a model made with another version.
-    FEATURE_VERSION = 1
-    FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb')
+    FEATURE_VERSION = 2
+    FEATURE_VERSIONS_OK = (1, 2)
+    FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile')
     FEATURE_SIZE = {'hs': 288, 'v': 16, 'mom': 12, 'exr': 64, 'lbp': 51, 'lbp2': 51, 'lbp4': 51, 'grad': 16,
-                    'ctr': 355, 'thumb': 768}
-    SQRT_GROUPS = ('hs', 'v', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr')
+                    'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403}
+    SQRT_GROUPS = ('hs', 'v', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'lab', 'tile')
+    TILE_GRID = 4                # 'tile': the image is cut into TILE_GRID x TILE_GRID tiles
+    ## Test-time augmentation views: (crop scale, vertical position, horizontal position), position 0 = top / left,
+    ## 1 = bottom / right. View 0 is the whole image; the model name says how many views are used (..._t5).
+    TTA_CROPS = ((1.0, 0.5, 0.5), (0.8, 0.0, 0.0), (0.8, 0.0, 1.0), (0.8, 1.0, 0.0), (0.8, 1.0, 1.0))
 
 
     def _lbp_orbits():
@@ -120,12 +130,19 @@ def test():
         return c / tf.reduce_sum(c)
 
 
+    def _value_codes(x, n, lo, hi):
+        '''
+            bin index 0..n-1 of real values in [lo, hi] (values outside go to the first / last bin)
+        '''
+        idx = tf.cast(tf.floor((x - lo) / (hi - lo) * n), tf.int32)
+        return tf.clip_by_value(idx, 0, n - 1)
+
+
     def _value_hist(x, n, lo, hi):
         '''
             normalized histogram of real values in [lo, hi] (values outside go to the first / last bin)
         '''
-        idx = tf.cast(tf.floor((x - lo) / (hi - lo) * n), tf.int32)
-        return _counts(tf.clip_by_value(idx, 0, n - 1), n)
+        return _counts(_value_codes(x, n, lo, hi), n)
 
 
     def _hs_v(img):
@@ -140,16 +157,23 @@ def test():
         return _counts(h * 8 + s, 288), _counts(v, 16), hsv
 
 
-    def _lbp(gray):
+    def _lbp_codes(gray):
         '''
             local binary pattern: every pixel is compared with its 8 neighbours (1 if neighbour >= centre)
-            -> an 8-bit code describing the local texture -> histogram of the 51 flip/turn classes of the codes
+            -> an 8-bit code describing the local texture -> its flip/turn class 0..50, for every inner pixel
         '''
         c = gray[1:-1, 1:-1]
         nb = [gray[:-2, :-2], gray[:-2, 1:-1], gray[:-2, 2:], gray[1:-1, 2:],
               gray[2:, 2:], gray[2:, 1:-1], gray[2:, :-2], gray[1:-1, :-2]]
         code = tf.add_n([tf.cast(n >= c, tf.int32) * (2 ** i) for i, n in enumerate(nb)])
-        return _counts(tf.gather(tf.constant(LBP_CLASS), code), 51)
+        return tf.gather(tf.constant(LBP_CLASS), code)
+
+
+    def _lbp(gray):
+        '''
+            histogram of the 51 flip/turn classes of the LBP codes
+        '''
+        return _counts(_lbp_codes(gray), 51)
 
 
     def _shrink(gray2d, factor):
@@ -160,6 +184,33 @@ def test():
         return tf.image.resize(gray2d[..., None], hw, antialias=True)[..., 0]
 
 
+    def _rgb_to_lab(img):
+        '''
+            sRGB in [0, 1] -> CIE L*a*b* (D65 white): L* 0..100 lightness, a* green (-) / red (+), b* blue (-) / yellow (+)
+        '''
+        lin = tf.where(img <= 0.04045, img / 12.92, tf.pow((img + 0.055) / 1.055, 2.4))
+        m = tf.constant([[0.4124564, 0.3575761, 0.1804375],
+                         [0.2126729, 0.7151522, 0.0721750],
+                         [0.0193339, 0.1191920, 0.9503041]], tf.float32)
+        xyz = tf.tensordot(lin, tf.transpose(m), axes=1) / tf.constant([0.95047, 1.0, 1.08883], tf.float32)
+        f = tf.where(xyz > 0.008856, tf.pow(tf.maximum(xyz, 1e-12), 1.0 / 3.0), 7.787 * xyz + 16.0 / 116.0)
+        return 116.0 * f[..., 1] - 16.0, 500.0 * (f[..., 0] - f[..., 1]), 200.0 * (f[..., 1] - f[..., 2])
+
+
+    def _tile_max(idx, n):
+        '''
+            idx [H, W] integer codes 0..n-1. The map is cut into TILE_GRID x TILE_GRID tiles, the normalized histogram of
+            every tile is computed, and for every bin the MAXIMUM over the tiles is kept (n values)
+        '''
+        h, w = tf.shape(idx)[0], tf.shape(idx)[1]
+        tile = (tf.range(h) * TILE_GRID // h)[:, None] * TILE_GRID + (tf.range(w) * TILE_GRID // w)[None, :]
+        k = TILE_GRID * TILE_GRID
+        c = tf.math.bincount(tf.reshape(tile * n + idx, [-1]), minlength=k * n, maxlength=k * n, dtype=tf.float32)
+        c = tf.reshape(c, [k, n])
+        c = c / tf.maximum(tf.reduce_sum(c, axis=1, keepdims=True), 1.0)
+        return tf.reduce_max(c, axis=0)
+
+
     def decode_image(file_path, ratio):
         '''
             reads a JPEG and decodes it directly at 1/ratio of its size (4000x2672 -> 500x334 with ratio 8)
@@ -167,6 +218,21 @@ def test():
         '''
         img = tf.io.decode_jpeg(tf.io.read_file(file_path), channels=3, ratio=ratio)
         return tf.cast(img, tf.float32) / 255.0
+
+
+    def tta_crop(img, view):
+        '''
+            test-time view number `view` (python int) of TTA_CROPS: the whole image or a fixed crop of it
+        '''
+        scale, py, px = TTA_CROPS[view]
+        if scale >= 1.0:
+            return img
+        h, w = tf.shape(img)[0], tf.shape(img)[1]
+        ch = tf.cast(tf.round(scale * tf.cast(h, tf.float32)), tf.int32)
+        cw = tf.cast(tf.round(scale * tf.cast(w, tf.float32)), tf.int32)
+        y0 = tf.cast(tf.round(py * tf.cast(h - ch, tf.float32)), tf.int32)
+        x0 = tf.cast(tf.round(px * tf.cast(w - cw, tf.float32)), tf.int32)
+        return img[y0:y0 + ch, x0:x0 + cw]
 
 
     def image_features(img, groups):
@@ -212,6 +278,24 @@ def test():
         if 'thumb' in need:
             # 16 x 16 colour thumbnail (layout of the image), 768 values
             out['thumb'] = tf.reshape(tf.image.resize(img, [16, 16], antialias=True), [-1])
+        if 'lab' in need:
+            # CIE L*a*b*: brown, orange and yellow lesions are further from healthy green on a* / b* than in HSV.
+            # 16 lightness bins + joint 16 x 16 histogram of a* (-48..32) and b* (-16..80)   -> 272
+            lab_l, lab_a, lab_b = _rgb_to_lab(img)
+            ab = _value_codes(lab_a, 16, -48.0, 32.0) * 16 + _value_codes(lab_b, 16, -16.0, 80.0)
+            out['lab'] = tf.concat([_value_hist(lab_l, 16, 0.0, 100.0), _counts(ab, 256)], 0)
+        if 'tile' in need:
+            # TILE POOLING: hue x saturation (288), excess red (32), excess green (32) and LBP (51) histograms of every
+            # tile; for every bin the maximum over the tiles. A lesion concentrated in one part of the image stands out
+            # instead of being diluted by the rest of the image, and it still counts the same wherever it is   -> 403
+            hsv_t = tf.image.rgb_to_hsv(img)
+            h_c = tf.minimum(tf.cast(hsv_t[..., 0] * 36, tf.int32), 35)
+            s_c = tf.minimum(tf.cast(hsv_t[..., 1] * 8, tf.int32), 7)
+            r_t, g_t, b_t = img[..., 0], img[..., 1], img[..., 2]
+            out['tile'] = tf.concat([_tile_max(h_c * 8 + s_c, 288),
+                                     _tile_max(_value_codes(r_t - g_t, 32, -0.4, 0.4), 32),
+                                     _tile_max(_value_codes(2 * g_t - r_t - b_t, 32, -0.4, 0.8), 32),
+                                     _tile_max(_lbp_codes(gray), 51)], 0)
 
         return tf.concat([tf.sqrt(out[k]) if k in SQRT_GROUPS else out[k] for k in groups], axis=0)
     #------------------------------------------------------------------------------------------------------------------
@@ -313,35 +397,41 @@ def test():
     #--------------------------------------------------------------------------------------------------------------
     def features_of(model):
         '''
-            feature models: (decode ratio, sorted feature groups) read from the name, None for pixel models
+            feature models: (decode ratio, sorted feature groups, number of TTA views) read from the name,
+            None for pixel models
         '''
-        m = re.search(r'_feat_r(\d+)_g-([a-z0-9-]+)_v(\d+)$', model.name)
+        m = re.search(r'_feat_r(\d+)_g-([a-z0-9-]+)_v(\d+)(?:_t(\d+))?$', model.name)
         if m is None:
             return None
-        if int(m.group(3)) != FEATURE_VERSION:
-            raise ValueError('{} was trained with feature version {}, this script computes version {}'.format(
-                model.name, m.group(3), FEATURE_VERSION))
+        if int(m.group(3)) not in FEATURE_VERSIONS_OK:
+            raise ValueError('{} was trained with feature version {}, this script computes versions {}'.format(
+                model.name, m.group(3), FEATURE_VERSIONS_OK))
         groups = m.group(2).split('-')
         if sort_feature_groups(groups) != groups:
             raise ValueError('Feature groups of {} are not in the expected order'.format(model.name))
-        return int(m.group(1)), groups
+        views = int(m.group(4)) if (m.group(4) is not None and TTA) else 1
+        if not 1 <= views <= len(TTA_CROPS):
+            raise ValueError('{} asks for {} test-time views, this script has {}'.format(model.name, views,
+                                                                                     len(TTA_CROPS)))
+        return int(m.group(1)), groups, views
 
     feature_cache = {}
 
-    def feature_matrix(ratio, groups):
+    def feature_matrix(ratio, groups, view=0):
         '''
-            features of every image of the split (in the order of the rows), computed once per (ratio, groups).
+            features of every image of the split (in the order of the rows) in test-time view `view` of TTA_CROPS
+            (0 = whole image), computed once per (ratio, groups, view) and shared by the models.
             tf.data runs image_features on all CPU cores at the same time; deterministic=True keeps the row order.
         '''
-        key = (ratio, tuple(groups))
+        key = (ratio, tuple(groups), view)
         if key not in feature_cache:
             ds = tf.data.Dataset.from_tensor_slices(ds_inputs)
-            ds = ds.map(lambda f: image_features(decode_image(f, ratio), groups), num_parallel_calls=AUTOTUNE,
-                        deterministic=True)
+            ds = ds.map(lambda f: image_features(tta_crop(decode_image(f, ratio), view), groups),
+                        num_parallel_calls=AUTOTUNE, deterministic=True)
             ds = ds.batch(64).prefetch(AUTOTUNE)
             feature_cache[key] = np.concatenate([xb.numpy() for xb in ds], axis=0)
-            print('Features computed: {} images x {} values (ratio {}, groups {})'.format(
-                feature_cache[key].shape[0], feature_cache[key].shape[1], ratio, '-'.join(groups)))
+            print('Features computed: {} images x {} values (ratio {}, groups {}, view {})'.format(
+                feature_cache[key].shape[0], feature_cache[key].shape[1], ratio, '-'.join(groups), view))
         return feature_cache[key]
 
     def preparation_of(model):
@@ -423,13 +513,20 @@ def test():
 
         if feat is not None:
             # feature model: colour + texture histograms -> model (features computed once, shared by the models)
-            ratio, groups = feat
-            X = feature_matrix(ratio, groups)
-            if X.shape[1] != n_inputs:
-                raise ValueError('{} expects {} inputs, the features have {}'.format(mf, n_inputs, X.shape[1]))
-            prob = np.asarray(final_model.predict(X, batch_size=1024, verbose=0))
-            print('Model used: {} ({} features, jpeg ratio {}, groups {})'.format(
-                os.path.basename(mf), n_inputs, ratio, '-'.join(groups)))
+            # with test-time augmentation: mean of the log-probabilities over the views, normalized again
+            ratio, groups, views = feat
+            logp = 0.0
+            for v in range(views):
+                X = feature_matrix(ratio, groups, v)
+                if X.shape[1] != n_inputs:
+                    raise ValueError('{} expects {} inputs, the features have {}'.format(mf, n_inputs, X.shape[1]))
+                p = np.asarray(final_model.predict(X, batch_size=1024, verbose=0))
+                logp = logp + np.log(np.clip(p, 1e-12, 1.0)).astype(np.float64)
+            logp = logp / views
+            prob = np.exp(logp - logp.max(axis=1, keepdims=True))
+            prob = prob / prob.sum(axis=1, keepdims=True)
+            print('Model used: {} ({} features, jpeg ratio {}, groups {}, {} test-time view(s))'.format(
+                os.path.basename(mf), n_inputs, ratio, '-'.join(groups), views))
         else:
             # pixel model (older versions of train_Matthew.py)
             image_size = int(round((n_inputs / CHANNELS) ** 0.5))

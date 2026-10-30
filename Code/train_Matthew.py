@@ -5,6 +5,7 @@ import time
 import re
 import argparse
 import itertools
+import zlib
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -17,6 +18,24 @@ from tensorflow.keras.utils import to_categorical
 
 '''
 Based on train_example.py (LSDR) and train_Matthew.py
+10/30/2026 pm: FEATURE AUGMENTATION + TEST-TIME CROPS (suggestion 3) + LESION FEATURES (suggestion 4)
+            - Diagnosis of the 10/30 run: train accuracy 0.996 vs validation 0.875, and 0.6M / 1.6M / 4.6M weights
+              all gave the same validation score -> the network memorizes the training images; it needs more varied
+              data and more informative features, not more capacity.
+            - AUGMENTATION: N_AUG_VIEWS random views of every TRAINING image (random crop of 60-100% of the height and
+              width, small brightness / contrast / saturation change) are computed once and cached. In every epoch
+              each training image is shown as one of its 1 + N_AUG_VIEWS versions, chosen at random. Validation
+              images are never augmented.
+            - TEST-TIME AUGMENTATION (TTA): the prediction is the mean of the log-probabilities over TTA_VIEWS views
+              of the image (whole image + 4 corner crops of 80%), the same views in train and test scripts.
+              The model name ends with _t<TTA_VIEWS> so test_Matthew.py knows how many views to use.
+            - NEW FEATURE GROUPS (FEATURE_VERSION 2, version 1 groups unchanged):
+              'lab'  CIE L*a*b* colour histograms (brown / orange / yellow lesions vs green leaf)
+              'tile' tile pooling: histograms of 4x4 tiles, maximum over the tiles for every bin, so a lesion
+                     concentrated in one part of the image is not diluted by the rest
+              (spatial pyramid / max pooling of local histograms: Lazebnik et al., 2006; Boureau et al., 2010;
+               CIE Lab: CIE 15:2004)
+            - GRID compares the feature sets with and without augmentation; TUNE_BIAS off (no gain on 10/30).
 10/30/2026: K-FOLD ENSEMBLE + CLASS BIAS TUNING
             - GRID (unchanged) only chooses the settings, on the fixed train/validation split. GRID = {} skips it.
             - FINAL MODELS: the "train" rows are split into N_FOLDS stratified parts (k-fold cross-validation).
@@ -67,8 +86,10 @@ NICKNAME = 'Matthew'
 ##  'exr' excess red / excess green (64)          'lbp'  texture, full size (51)        'lbp2' texture, 1/2 size (51)
 ##  'lbp4' texture, 1/4 size (51)                 'grad' edge strength (16)             'ctr'  hs + v + lbp of the centre (355)
 ##  'thumb' 16x16 colour thumbnail (768)
+##  'lab' CIE L*a*b* histograms (272)               'tile' max over 4x4 tiles of hs + exr + lbp histograms (403)
 ## 240-image test: all groups but 'thumb' was the best set (thumbnail = raw pixels again, it lowered the score)
-FEATURE_GROUPS = ['hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr']
+FEATURES_V1 = ['hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr']      # the 10/30 set (904 features)
+FEATURE_GROUPS = FEATURES_V1 + ['lab', 'tile']
 FEATURE_RATIO = 8            # JPEG decoded at 1/8 size (500x334). Ratio 4 (1000x668) was not better and is 3x slower
 EXTRACT_PARALLEL = 0         # images processed at the same time: 0 = automatic (all CPU cores), n = n images
 EXTRACT_BATCH = 64
@@ -81,9 +102,10 @@ MIN_FEATURE_STD = 0.01
 HIDDEN_LAYERS = [1024, 512, 256]   # neurons of each hidden Dense layer
 ACTIVATION = 'relu'
 USE_BATCHNORM = True               # Dense -> BatchNorm -> activation -> Dropout
-DROPOUT_RATE = 0.3                 # after every hidden layer (0 = off). Works together with BatchNorm here
+DROPOUT_RATE = 0.4                 # after every hidden layer (0 = off). Works together with BatchNorm here
 INPUT_DROPOUT = 0.0                # dropout on the normalized features themselves (0 = off)
-WEIGHT_DECAY = 1e-4                # L2 penalty on every Dense kernel (0 = off)
+WEIGHT_DECAY = 0.0                 # L2 penalty on every Dense kernel (0 = off)
+## (hidden / dropout / weight decay = best combination of the 10/30 grid)
 KERNEL_INIT = 'he_normal'          # Kaiming init for ReLU (book Eq. 4.34)
 LABEL_SMOOTHING = 0.0              # e.g. 0.1: targets 0.9 / 0.02 instead of 1 / 0 (0 = off)
 
@@ -113,19 +135,39 @@ LR_PATIENCE = 8
 LR_MIN = 1e-6
 PRINT_EVERY = 10                   # print one line every PRINT_EVERY epochs (and the last one)
 
+## ---- Feature-level augmentation (suggestion 3) ------------------------------------------------------------------
+## N_AUG_VIEWS random views of every training image, computed once and cached in features_cache/ (first run: about
+## N_AUG_VIEWS x 4 min). Each view: random crop of AUG_SCALE of the height and of the width at a random position, then
+## a small random change of brightness, contrast and saturation (no hue change: colour is the main signal). The same
+## image always gets the same views (seeded by its name), so the cache stays valid. 0 = no augmentation.
+N_AUG_VIEWS = 4
+AUG_SEED = 2026
+AUG_SCALE = (0.6, 1.0)
+AUG_BRIGHTNESS = 0.08        # random value in [-0.08, 0.08] added to the pixels (0..1)
+AUG_CONTRAST = 0.15          # contrast factor in [0.85, 1.15]
+AUG_SATURATION = 0.10        # saturation factor in [0.90, 1.10]
+
+## ---- Test-time augmentation -------------------------------------------------------------------------------------
+## prediction = mean of the log-probabilities over the first TTA_VIEWS views of TTA_CROPS (whole image + 4 corner crops
+## of 80%); 1 = whole image only. Written in the model name (_t5): test_Matthew.py uses the same views.
+## The views are computed for the training images too (cached), so the GRID ranks the combinations by their
+## validation score WITH test-time augmentation, i.e. the way the submitted models predict.
+TTA_VIEWS = 5
+
 ## ---- Grid of experiments -------------------------------------------------------------------------------------
 ## Every combination is trained on the same train/validation split (VAL_FRACTION, SEED) and logged to
 ## grid_<NICKNAME>.csv and experiments_<NICKNAME>.csv. The best mean validation (F1 + kappa)/2 wins.
 ## Allowed keys: the setting names above (HIDDEN_LAYERS, DROPOUT_RATE, INPUT_DROPOUT, WEIGHT_DECAY, USE_BATCHNORM,
-## LEARNING_RATE, BATCH_SIZE, CLASS_WEIGHTS, LABEL_SMOOTHING, FEATURE_GROUPS, ACTIVATION, OPTIMIZER).
+## LEARNING_RATE, BATCH_SIZE, CLASS_WEIGHTS, LABEL_SMOOTHING, FEATURE_GROUPS, ACTIVATION, OPTIMIZER, N_AUG_VIEWS).
+## Ranking: validation (F1 + kappa)/2 with TTA (TTA_VIEWS > 1); the epoch kept is chosen on the whole images.
+## The test score is printed with and without TTA (information only).
 ## GRID = {} -> one run with the settings above.
 ## Reading the result (train accuracy is measured on the training part, inference mode):
 ##   train and validation both low and close   -> too simple / too regularized: wider, deeper, less dropout
 ##   train much higher than validation (>0.15) -> overfitting: more dropout / weight decay, or smaller
 GRID = {
-    'HIDDEN_LAYERS': [[512, 256], [1024, 512, 256], [2048, 1024, 512, 256]],
-    'DROPOUT_RATE': [0.2, 0.4],
-    'WEIGHT_DECAY': [0.0, 1e-4],
+    'FEATURE_GROUPS': [FEATURES_V1, FEATURES_V1 + ['lab'], FEATURES_V1 + ['tile'], FEATURES_V1 + ['lab', 'tile']],
+    'N_AUG_VIEWS': [0, 4],
 }
 ## each combination is trained once per seed and the validation scores are averaged (differences below ~0.01 between
 ## two combinations are within the noise of one seed: use 2-3 seeds to separate close ones)
@@ -139,7 +181,7 @@ N_FOLDS = 5
 CV_SEED = 42                 # split of the folds; model k uses seed CV_SEED + k (initial weights, shuffling)
 
 ## ---- Class bias tuning on the out-of-fold predictions (suggestion 5) --------------------------------------------
-TUNE_BIAS = True
+TUNE_BIAS = False            # 10/30 run: 0.8589 without, 0.8581 with -> off
 BIAS_RANGE = 1.5             # each class bias is searched in [-BIAS_RANGE, +BIAS_RANGE] (in log-probability units)
 BIAS_STEP = 0.05
 BIAS_ROUNDS = 3              # passes over the classes (coordinate ascent), stops early when nothing improves
@@ -157,7 +199,8 @@ PATH = os.path.dirname(SCRIPT_DIR)
 DATA_DIR = PATH + os.path.sep + 'Data' + os.path.sep
 
 GRID_KEYS = ('HIDDEN_LAYERS', 'DROPOUT_RATE', 'INPUT_DROPOUT', 'WEIGHT_DECAY', 'USE_BATCHNORM', 'LEARNING_RATE',
-             'BATCH_SIZE', 'CLASS_WEIGHTS', 'LABEL_SMOOTHING', 'FEATURE_GROUPS', 'ACTIVATION', 'OPTIMIZER')
+             'BATCH_SIZE', 'CLASS_WEIGHTS', 'LABEL_SMOOTHING', 'FEATURE_GROUPS', 'ACTIVATION', 'OPTIMIZER',
+             'N_AUG_VIEWS')
 MONITORS = ('val_score', 'val_loss', 'val_f1_macro', 'val_kappa', 'val_accuracy')
 
 
@@ -172,12 +215,19 @@ def out_file(name):
 ## it is on the leaf. Groups are always computed and concatenated in the order of FEATURE_ORDER.
 ## Histograms are square-rooted (Hellinger / power normalization: rare lesion colours and textures count more).
 ## LBP codes are grouped into the 51 classes that stay the same when the leaf is flipped or turned by 90 degrees.
+## Version 2 (10/30/2026): new groups 'lab' and 'tile', test-time crops TTA_CROPS. The version 1 groups are computed
+## exactly as in version 1, so models of both versions are accepted (FEATURE_VERSIONS_OK).
 ## Change FEATURE_VERSION whenever this block changes: test_Matthew.py refuses a model made with another version.
-FEATURE_VERSION = 1
-FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb')
+FEATURE_VERSION = 2
+FEATURE_VERSIONS_OK = (1, 2)
+FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile')
 FEATURE_SIZE = {'hs': 288, 'v': 16, 'mom': 12, 'exr': 64, 'lbp': 51, 'lbp2': 51, 'lbp4': 51, 'grad': 16,
-                'ctr': 355, 'thumb': 768}
-SQRT_GROUPS = ('hs', 'v', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr')
+                'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403}
+SQRT_GROUPS = ('hs', 'v', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'lab', 'tile')
+TILE_GRID = 4                # 'tile': the image is cut into TILE_GRID x TILE_GRID tiles
+## Test-time augmentation views: (crop scale, vertical position, horizontal position), position 0 = top / left,
+## 1 = bottom / right. View 0 is the whole image; the model name says how many views are used (..._t5).
+TTA_CROPS = ((1.0, 0.5, 0.5), (0.8, 0.0, 0.0), (0.8, 0.0, 1.0), (0.8, 1.0, 0.0), (0.8, 1.0, 1.0))
 
 
 def _lbp_orbits():
@@ -219,12 +269,19 @@ def _counts(idx, n):
     return c / tf.reduce_sum(c)
 
 
+def _value_codes(x, n, lo, hi):
+    '''
+        bin index 0..n-1 of real values in [lo, hi] (values outside go to the first / last bin)
+    '''
+    idx = tf.cast(tf.floor((x - lo) / (hi - lo) * n), tf.int32)
+    return tf.clip_by_value(idx, 0, n - 1)
+
+
 def _value_hist(x, n, lo, hi):
     '''
         normalized histogram of real values in [lo, hi] (values outside go to the first / last bin)
     '''
-    idx = tf.cast(tf.floor((x - lo) / (hi - lo) * n), tf.int32)
-    return _counts(tf.clip_by_value(idx, 0, n - 1), n)
+    return _counts(_value_codes(x, n, lo, hi), n)
 
 
 def _hs_v(img):
@@ -239,16 +296,23 @@ def _hs_v(img):
     return _counts(h * 8 + s, 288), _counts(v, 16), hsv
 
 
-def _lbp(gray):
+def _lbp_codes(gray):
     '''
         local binary pattern: every pixel is compared with its 8 neighbours (1 if neighbour >= centre)
-        -> an 8-bit code describing the local texture -> histogram of the 51 flip/turn classes of the codes
+        -> an 8-bit code describing the local texture -> its flip/turn class 0..50, for every inner pixel
     '''
     c = gray[1:-1, 1:-1]
     nb = [gray[:-2, :-2], gray[:-2, 1:-1], gray[:-2, 2:], gray[1:-1, 2:],
           gray[2:, 2:], gray[2:, 1:-1], gray[2:, :-2], gray[1:-1, :-2]]
     code = tf.add_n([tf.cast(n >= c, tf.int32) * (2 ** i) for i, n in enumerate(nb)])
-    return _counts(tf.gather(tf.constant(LBP_CLASS), code), 51)
+    return tf.gather(tf.constant(LBP_CLASS), code)
+
+
+def _lbp(gray):
+    '''
+        histogram of the 51 flip/turn classes of the LBP codes
+    '''
+    return _counts(_lbp_codes(gray), 51)
 
 
 def _shrink(gray2d, factor):
@@ -259,6 +323,33 @@ def _shrink(gray2d, factor):
     return tf.image.resize(gray2d[..., None], hw, antialias=True)[..., 0]
 
 
+def _rgb_to_lab(img):
+    '''
+        sRGB in [0, 1] -> CIE L*a*b* (D65 white): L* 0..100 lightness, a* green (-) / red (+), b* blue (-) / yellow (+)
+    '''
+    lin = tf.where(img <= 0.04045, img / 12.92, tf.pow((img + 0.055) / 1.055, 2.4))
+    m = tf.constant([[0.4124564, 0.3575761, 0.1804375],
+                     [0.2126729, 0.7151522, 0.0721750],
+                     [0.0193339, 0.1191920, 0.9503041]], tf.float32)
+    xyz = tf.tensordot(lin, tf.transpose(m), axes=1) / tf.constant([0.95047, 1.0, 1.08883], tf.float32)
+    f = tf.where(xyz > 0.008856, tf.pow(tf.maximum(xyz, 1e-12), 1.0 / 3.0), 7.787 * xyz + 16.0 / 116.0)
+    return 116.0 * f[..., 1] - 16.0, 500.0 * (f[..., 0] - f[..., 1]), 200.0 * (f[..., 1] - f[..., 2])
+
+
+def _tile_max(idx, n):
+    '''
+        idx [H, W] integer codes 0..n-1. The map is cut into TILE_GRID x TILE_GRID tiles, the normalized histogram of
+        every tile is computed, and for every bin the MAXIMUM over the tiles is kept (n values)
+    '''
+    h, w = tf.shape(idx)[0], tf.shape(idx)[1]
+    tile = (tf.range(h) * TILE_GRID // h)[:, None] * TILE_GRID + (tf.range(w) * TILE_GRID // w)[None, :]
+    k = TILE_GRID * TILE_GRID
+    c = tf.math.bincount(tf.reshape(tile * n + idx, [-1]), minlength=k * n, maxlength=k * n, dtype=tf.float32)
+    c = tf.reshape(c, [k, n])
+    c = c / tf.maximum(tf.reduce_sum(c, axis=1, keepdims=True), 1.0)
+    return tf.reduce_max(c, axis=0)
+
+
 def decode_image(file_path, ratio):
     '''
         reads a JPEG and decodes it directly at 1/ratio of its size (4000x2672 -> 500x334 with ratio 8)
@@ -266,6 +357,21 @@ def decode_image(file_path, ratio):
     '''
     img = tf.io.decode_jpeg(tf.io.read_file(file_path), channels=3, ratio=ratio)
     return tf.cast(img, tf.float32) / 255.0
+
+
+def tta_crop(img, view):
+    '''
+        test-time view number `view` (python int) of TTA_CROPS: the whole image or a fixed crop of it
+    '''
+    scale, py, px = TTA_CROPS[view]
+    if scale >= 1.0:
+        return img
+    h, w = tf.shape(img)[0], tf.shape(img)[1]
+    ch = tf.cast(tf.round(scale * tf.cast(h, tf.float32)), tf.int32)
+    cw = tf.cast(tf.round(scale * tf.cast(w, tf.float32)), tf.int32)
+    y0 = tf.cast(tf.round(py * tf.cast(h - ch, tf.float32)), tf.int32)
+    x0 = tf.cast(tf.round(px * tf.cast(w - cw, tf.float32)), tf.int32)
+    return img[y0:y0 + ch, x0:x0 + cw]
 
 
 def image_features(img, groups):
@@ -311,22 +417,73 @@ def image_features(img, groups):
     if 'thumb' in need:
         # 16 x 16 colour thumbnail (layout of the image), 768 values
         out['thumb'] = tf.reshape(tf.image.resize(img, [16, 16], antialias=True), [-1])
+    if 'lab' in need:
+        # CIE L*a*b*: brown, orange and yellow lesions are further from healthy green on a* / b* than in HSV.
+        # 16 lightness bins + joint 16 x 16 histogram of a* (-48..32) and b* (-16..80)   -> 272
+        lab_l, lab_a, lab_b = _rgb_to_lab(img)
+        ab = _value_codes(lab_a, 16, -48.0, 32.0) * 16 + _value_codes(lab_b, 16, -16.0, 80.0)
+        out['lab'] = tf.concat([_value_hist(lab_l, 16, 0.0, 100.0), _counts(ab, 256)], 0)
+    if 'tile' in need:
+        # TILE POOLING: hue x saturation (288), excess red (32), excess green (32) and LBP (51) histograms of every
+        # tile; for every bin the maximum over the tiles. A lesion concentrated in one part of the image stands out
+        # instead of being diluted by the rest of the image, and it still counts the same wherever it is   -> 403
+        hsv_t = tf.image.rgb_to_hsv(img)
+        h_c = tf.minimum(tf.cast(hsv_t[..., 0] * 36, tf.int32), 35)
+        s_c = tf.minimum(tf.cast(hsv_t[..., 1] * 8, tf.int32), 7)
+        r_t, g_t, b_t = img[..., 0], img[..., 1], img[..., 2]
+        out['tile'] = tf.concat([_tile_max(h_c * 8 + s_c, 288),
+                                 _tile_max(_value_codes(r_t - g_t, 32, -0.4, 0.4), 32),
+                                 _tile_max(_value_codes(2 * g_t - r_t - b_t, 32, -0.4, 0.8), 32),
+                                 _tile_max(_lbp_codes(gray), 51)], 0)
 
     return tf.concat([tf.sqrt(out[k]) if k in SQRT_GROUPS else out[k] for k in groups], axis=0)
 #------------------------------------------------------------------------------------------------------------------
 
-def extract_features(paths, groups, ratio):
+def augment_image(img, seed):
+    '''
+        one random training view of img [H, W, 3] in [0, 1]: random crop (AUG_SCALE of the height and of the width,
+        random position), then random brightness, contrast and saturation. seed: int64 [2] (stateless: the same seed
+        always gives the same view)
+    '''
+    s = tf.cast(seed, tf.int64)
+    sub = lambda k: s + tf.constant([0, 1], tf.int64) * k            # a different seed for every random choice
+    h, w = tf.shape(img)[0], tf.shape(img)[1]
+    scale = tf.random.stateless_uniform([], sub(1), AUG_SCALE[0], AUG_SCALE[1])
+    ch = tf.maximum(tf.cast(tf.round(scale * tf.cast(h, tf.float32)), tf.int32), 8)
+    cw = tf.maximum(tf.cast(tf.round(scale * tf.cast(w, tf.float32)), tf.int32), 8)
+    out = tf.image.stateless_random_crop(img, tf.stack([tf.minimum(ch, h), tf.minimum(cw, w), 3]), sub(2))
+    if AUG_BRIGHTNESS > 0:
+        out = tf.image.stateless_random_brightness(out, AUG_BRIGHTNESS, sub(3))
+    if AUG_CONTRAST > 0:
+        out = tf.image.stateless_random_contrast(out, 1.0 - AUG_CONTRAST, 1.0 + AUG_CONTRAST, sub(4))
+    if AUG_SATURATION > 0:
+        out = tf.image.stateless_random_saturation(tf.clip_by_value(out, 0.0, 1.0), 1.0 - AUG_SATURATION,
+                                                   1.0 + AUG_SATURATION, sub(5))
+    return tf.clip_by_value(out, 0.0, 1.0)
+#------------------------------------------------------------------------------------------------------------------
+
+def extract_features(paths, seeds, groups, ratio, view):
     '''
         features of every image in paths (same order), as a float32 array [len(paths), n_features]
+        view: 'orig' (whole image), 'aug<j>' (random training view j, seeds [len(paths), 2]),
+              'tta<j>' (test-time crop j of TTA_CROPS)
 
         Parallel "data generator": tf.data runs image_features on EXTRACT_PARALLEL images at the same time
         (0 = AUTOTUNE = one per CPU core). The JPEG decoding and the histogram ops run in TensorFlow's C++ thread
         pool, outside the Python GIL, so all the vCPUs of the instance work together (measured: 1.6x faster with
         2 cores than with 1). deterministic=True keeps the output in the order of paths.
     '''
+    def one(f, seed):
+        img = decode_image(f, ratio)
+        if view.startswith('aug'):
+            img = augment_image(img, seed)
+        elif view.startswith('tta'):
+            img = tta_crop(img, int(view[3:]))
+        return image_features(img, groups)
+
     par = AUTOTUNE if EXTRACT_PARALLEL <= 0 else EXTRACT_PARALLEL
-    ds = tf.data.Dataset.from_tensor_slices(list(paths))
-    ds = ds.map(lambda f: image_features(decode_image(f, ratio), groups), num_parallel_calls=par, deterministic=True)
+    ds = tf.data.Dataset.from_tensor_slices((list(paths), np.asarray(seeds, np.int64)))
+    ds = ds.map(one, num_parallel_calls=par, deterministic=True)
     ds = ds.batch(EXTRACT_BATCH).prefetch(AUTOTUNE)
 
     out, done, t0 = [], 0, time.time()
@@ -335,20 +492,28 @@ def extract_features(paths, groups, ratio):
         done += xb.shape[0]
         if done % (EXTRACT_BATCH * 16) < EXTRACT_BATCH or done == len(paths):
             rate = done / max(time.time() - t0, 1e-9)
-            print('  features: {:6d} / {} images  ({:.0f} images/s, {:.1f} min left)'.format(
-                done, len(paths), rate, (len(paths) - done) / rate / 60))
+            print('  features ({}): {:6d} / {} images  ({:.0f} images/s, {:.1f} min left)'.format(
+                view, done, len(paths), rate, (len(paths) - done) / rate / 60))
     return np.concatenate(out, axis=0).astype(np.float32)
 #------------------------------------------------------------------------------------------------------------------
 
-def load_feature_cache(ids):
+def load_feature_cache(ids, view='orig'):
     '''
-        features of ALL groups (FEATURE_ORDER) for the image ids, from features_cache/ when available.
-        Only the images missing from the cache are computed (first run: all of them, ~14,700 images).
-        Returns X_all [len(ids), sum of all FEATURE_SIZE]
+        features of ALL groups (FEATURE_ORDER) of one view of the image ids, from features_cache/ when available.
+        Only the images missing from the cache are computed.
+          'orig'   whole image (all rows; first run ~14,700 images)
+          'aug<j>' random training view j (training rows). The file name holds a code of the AUG_* settings, so
+                   changing them makes new views instead of reusing old ones
+          'tta<j>' test-time crop j (all rows: validation with TTA in the grid / folds, test rows)
+        Returns [len(ids), sum of all FEATURE_SIZE]
     '''
     folder = os.path.join(SCRIPT_DIR, CACHE_DIR)
     os.makedirs(folder, exist_ok=True)
-    file_name = os.path.join(folder, 'features_r{}_v{}.npz'.format(FEATURE_RATIO, FEATURE_VERSION))
+    tag = view
+    if view.startswith('aug'):
+        tag += '_{:08x}'.format(zlib.crc32(repr((AUG_SEED, tuple(AUG_SCALE), AUG_BRIGHTNESS, AUG_CONTRAST,
+                                                 AUG_SATURATION)).encode()))
+    file_name = os.path.join(folder, 'features_r{}_v{}_{}.npz'.format(FEATURE_RATIO, FEATURE_VERSION, tag))
     n_all = sum(FEATURE_SIZE[g] for g in FEATURE_ORDER)
 
     cached_ids, cached_X = np.array([], dtype=object), np.zeros((0, n_all), np.float32)
@@ -362,9 +527,11 @@ def load_feature_cache(ids):
     position = {k: i for i, k in enumerate(cached_ids)}
     missing = [i for i in dict.fromkeys(ids) if i not in position]     # unique ids, in order
     if missing:
-        print('Computing the features of {} images (ratio {}, all groups, cached in {}) ...'.format(
-            len(missing), FEATURE_RATIO, file_name))
-        X_new = extract_features([DATA_DIR + i for i in missing], list(FEATURE_ORDER), FEATURE_RATIO)
+        print('Computing the features of {} images, view {} (ratio {}, all groups, cached in {}) ...'.format(
+            len(missing), view, FEATURE_RATIO, file_name))
+        j = int(view[3:]) if view[3:].isdigit() else 0
+        seeds = [[AUG_SEED * 1000 + j, zlib.crc32(i.encode())] for i in missing]   # same image -> same view
+        X_new = extract_features([DATA_DIR + i for i in missing], seeds, list(FEATURE_ORDER), FEATURE_RATIO, view)
         if not np.all(np.isfinite(X_new)):
             raise ValueError('NaN/inf in the features of some images')
         cached_ids = np.concatenate([cached_ids, np.array(missing, dtype=object)])
@@ -410,10 +577,11 @@ def grid_configs():
 #------------------------------------------------------------------------------------------------------------------
 
 def config_text(cfg):
-    return 'feat={} | hidden={} | dropout={} | in_drop={} | wd={} | bn={} | lr={} | batch={} | cw={} | ls={}'.format(
-        '-'.join(cfg['FEATURE_GROUPS']), cfg['HIDDEN_LAYERS'], cfg['DROPOUT_RATE'], cfg['INPUT_DROPOUT'],
-        cfg['WEIGHT_DECAY'], cfg['USE_BATCHNORM'], cfg['LEARNING_RATE'], cfg['BATCH_SIZE'], cfg['CLASS_WEIGHTS'],
-        cfg['LABEL_SMOOTHING'])
+    return ('feat={} | aug={} | hidden={} | dropout={} | in_drop={} | wd={} | bn={} | lr={} | batch={} | cw={} '
+            '| ls={}').format(
+        '-'.join(cfg['FEATURE_GROUPS']), cfg['N_AUG_VIEWS'], cfg['HIDDEN_LAYERS'], cfg['DROPOUT_RATE'],
+        cfg['INPUT_DROPOUT'], cfg['WEIGHT_DECAY'], cfg['USE_BATCHNORM'], cfg['LEARNING_RATE'], cfg['BATCH_SIZE'],
+        cfg['CLASS_WEIGHTS'], cfg['LABEL_SMOOTHING'])
 #------------------------------------------------------------------------------------------------------------------
 
 def check_settings():
@@ -435,6 +603,10 @@ def check_settings():
         raise ValueError('VAL_FRACTION must be in (0, 1)')
     if int(N_FOLDS) < 2:
         raise ValueError('N_FOLDS must be 2 or more')
+    if not 1 <= int(TTA_VIEWS) <= len(TTA_CROPS):
+        raise ValueError('TTA_VIEWS must be between 1 and {}'.format(len(TTA_CROPS)))
+    if not 0.0 < AUG_SCALE[0] <= AUG_SCALE[1] <= 1.0:
+        raise ValueError('AUG_SCALE must be (low, high) with 0 < low <= high <= 1')
     if TUNE_BIAS and (BIAS_RANGE <= 0 or BIAS_STEP <= 0 or BIAS_ROUNDS < 1):
         raise ValueError('BIAS_RANGE, BIAS_STEP must be > 0 and BIAS_ROUNDS >= 1')
     if EARLY_STOP_PATIENCE > 0 and LR_SCHEDULE == 'plateau' and LR_PATIENCE >= EARLY_STOP_PATIENCE:
@@ -446,6 +618,8 @@ def check_settings():
             raise ValueError("CLASS_WEIGHTS must be 'balanced', 'sqrt' or 'none'")
         if len(cfg['HIDDEN_LAYERS']) == 0:
             raise ValueError('HIDDEN_LAYERS needs at least one layer')
+        if int(cfg['N_AUG_VIEWS']) < 0:
+            raise ValueError('N_AUG_VIEWS must be 0 or more')
 #------------------------------------------------------------------------------------------------------------------
 
 def find_excel():
@@ -592,10 +766,12 @@ def make_optimizer(cfg):
 def model_name(cfg):
     '''
         the name tells test_Matthew.py how to compute the input of the model:
-        MLP_Matthew_feat_r8_g-hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr_v1
-            r8 = JPEG decode ratio, g-... = feature groups in FEATURE_ORDER, v1 = FEATURE_VERSION
+        MLP_Matthew_feat_r8_g-hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-lab-tile_v2_t5
+            r8 = JPEG decode ratio, g-... = feature groups in FEATURE_ORDER, v2 = FEATURE_VERSION,
+            t5 = number of test-time views (TTA_VIEWS)
     '''
-    return 'MLP_{}_feat_r{}_g-{}_v{}'.format(NICKNAME, FEATURE_RATIO, '-'.join(cfg['FEATURE_GROUPS']), FEATURE_VERSION)
+    return 'MLP_{}_feat_r{}_g-{}_v{}_t{}'.format(NICKNAME, FEATURE_RATIO, '-'.join(cfg['FEATURE_GROUPS']),
+                                                 FEATURE_VERSION, TTA_VIEWS)
 #------------------------------------------------------------------------------------------------------------------
 
 def model_definition(cfg, mean, std):
@@ -644,6 +820,14 @@ def weights_only_copy(model):
     copy = model.__class__.from_config(model.get_config())
     copy.set_weights(model.get_weights())
     return copy
+#------------------------------------------------------------------------------------------------------------------
+
+def predict_views_logp(model, X_views):
+    '''
+        X_views [T, n, d]: the same n images seen in T views -> mean over the views of the log-probabilities [n, K]
+        (test-time augmentation; T = 1 -> the plain log-probabilities)
+    '''
+    return np.mean([log_softmax_np(predict_np(model, Xv)) for Xv in X_views], axis=0)
 #------------------------------------------------------------------------------------------------------------------
 
 def log_softmax_np(prob):
@@ -771,25 +955,39 @@ def monitor_mode(monitor):
 def train_one(cfg, X_tr, y_tr, X_val, y_val, seed, label=''):
     '''
         trains one model of config cfg on (X_tr, y_tr), early stopping on (X_val, y_val)
-        X_* : features of the cfg feature groups,  y_* : class index
+        X_tr  : [V, n, d] the n training images in V versions (version 0 = whole image, 1.. = augmented views)
+        X_val : [m, d] whole validation images (never augmented)
+        y_*   : class index
+        In every epoch each training image is shown in ONE of its V versions, chosen at random.
         returns model (weights of the best epoch), history, info dict
     '''
     tf.keras.utils.set_random_seed(seed)
+    n_views, n, d = X_tr.shape
 
     class_w = compute_class_weights(y_tr, OUTPUTS_a, cfg['CLASS_WEIGHTS'])
 
-    # z-score statistics of the TRAINING part only, stored in the first layer of the model
-    mean = X_tr.mean(axis=0)
-    std = np.maximum(X_tr.std(axis=0), MIN_FEATURE_STD)
+    # z-score statistics of the TRAINING part only (all its versions), stored in the first layer of the model
+    flat = X_tr.reshape(-1, d)
+    mean = flat.mean(axis=0)
+    std = np.maximum(flat.std(axis=0), MIN_FEATURE_STD)
+    del flat
 
     y_onehot = to_categorical(y_tr, num_classes=OUTPUTS_a).astype(np.float32)
     w = class_w[y_tr]
-    ds = tf.data.Dataset.from_tensor_slices((X_tr, y_onehot, w))
-    ds = ds.shuffle(len(X_tr), seed=seed, reshuffle_each_iteration=True).batch(cfg['BATCH_SIZE']).prefetch(AUTOTUNE)
+    if n_views == 1:
+        ds = tf.data.Dataset.from_tensor_slices((X_tr[0], y_onehot, w))
+        ds = ds.shuffle(n, seed=seed, reshuffle_each_iteration=True).batch(cfg['BATCH_SIZE'])
+    else:
+        # [n, V, d]: one row per image with all its versions; after batching, one version per image is picked
+        ds = tf.data.Dataset.from_tensor_slices((np.ascontiguousarray(np.transpose(X_tr, (1, 0, 2))), y_onehot, w))
+        ds = ds.shuffle(n, seed=seed, reshuffle_each_iteration=True).batch(cfg['BATCH_SIZE'])
+        ds = ds.map(lambda x, y, wt: (tf.gather(x, tf.random.uniform([tf.shape(x)[0]], 0, n_views, tf.int32),
+                                                batch_dims=1), y, wt), num_parallel_calls=AUTOTUNE)
+    ds = ds.prefetch(AUTOTUNE)
 
     best = BestWeights(CHECKPOINT_MONITOR)
     callbacks = [tf.keras.callbacks.TerminateOnNaN(),
-                 ValidationMetrics(X_val, y_val, class_w, X_tr, y_tr, label), best]
+                 ValidationMetrics(X_val, y_val, class_w, X_tr[0], y_tr, label), best]
     if LR_SCHEDULE == 'plateau':
         callbacks.append(tf.keras.callbacks.ReduceLROnPlateau(monitor=EARLY_STOP_MONITOR,
                                                               mode=monitor_mode(EARLY_STOP_MONITOR),
@@ -988,6 +1186,7 @@ def log_experiment(row):
 
 def experiment_row(stage, cfg, info, test, seed, extra=None):
     row = {'stage': stage, 'model': 'features', 'feature_groups': '-'.join(cfg['FEATURE_GROUPS']),
+           'n_aug_views': cfg['N_AUG_VIEWS'], 'tta_views': TTA_VIEWS,
            'n_features': int(sum(FEATURE_SIZE[g] for g in cfg['FEATURE_GROUPS'])),
            'hidden': str(cfg['HIDDEN_LAYERS']), 'dropout': cfg['DROPOUT_RATE'], 'input_dropout': cfg['INPUT_DROPOUT'],
            'batchnorm': cfg['USE_BATCHNORM'], 'weight_decay': cfg['WEIGHT_DECAY'], 'optimizer': cfg['OPTIMIZER'],
@@ -1039,57 +1238,89 @@ def main():
             len(missing), missing[:3], DATA_DIR))
 
     ## Features of every row (train + test), all groups; each config takes its columns
-    X_all = load_feature_cache(xdf_data['id'].tolist())
+    ids = xdf_data['id'].tolist()
+    X_all = load_feature_cache(ids, 'orig')
     y_all = xdf_data['target'].map(class_to_idx).to_numpy()
 
     idx_train = np.where(is_train)[0]
     idx_test = np.where(is_test)[0]
+    y_train, y_test = y_all[idx_train], y_all[idx_test]
+
+    ## training rows: whole image + the augmented views (as many as the largest N_AUG_VIEWS used)   [V, n_train, D]
+    n_aug = max(int(c['N_AUG_VIEWS']) for c in configs)
+    train_ids = [ids[i] for i in idx_train]
+    X_train_views = np.stack([X_all[idx_train]] + [load_feature_cache(train_ids, 'aug{}'.format(j))
+                                                    for j in range(1, n_aug + 1)])
+    ## all rows: whole image + the TTA crops; split into training rows (validation with TTA) and test rows
+    tta_all = [X_all] + [load_feature_cache(ids, 'tta{}'.format(j)) for j in range(1, TTA_VIEWS)]
+    X_train_tta = np.stack([t[idx_train] for t in tta_all])      # [TTA_VIEWS, n_train, D]
+    X_test_views = np.stack([t[idx_test] for t in tta_all])      # [TTA_VIEWS, n_test, D]
+    del X_all, tta_all
+    print('Training images: {} ({} version(s) each for training, {} TTA view(s) for validation)   '
+          'Test images: {} ({} TTA view(s))'.format(len(idx_train), X_train_views.shape[0], X_train_tta.shape[0],
+                                                    len(idx_test), X_test_views.shape[0]))
+    rank_key = 'val_score_tta' if TTA_VIEWS > 1 else 'val_score'
+
+    def test_scores(model, Xt):
+        ''' (score whole image only, score with TTA) of one model on the test rows (information only) '''
+        lp1 = log_softmax_np(predict_np(model, Xt[0]))
+        lpt = predict_views_logp(model, Xt) if len(Xt) > 1 else lp1
+        return lp1, lpt, scores(y_test, np.argmax(lp1, axis=1)), scores(y_test, np.argmax(lpt, axis=1))
 
     #--------------------------------------------------------------------------------------------------------------
-    # GRID (chooses the settings only; its models are not saved)
+    # GRID (chooses the settings only; its models are not saved). Validation: whole images only.
     if run_grid:
         ## Fixed split for the grid: stratified, same seed -> every combination sees the same images
-        idx_tr, idx_val = train_test_split(idx_train, test_size=VAL_FRACTION, stratify=y_all[idx_train],
+        ## (positions inside the training rows; same split as before)
+        pos_tr, pos_val = train_test_split(np.arange(len(idx_train)), test_size=VAL_FRACTION, stratify=y_train,
                                            random_state=SEED)
-        idx_tr, idx_val = np.sort(idx_tr), np.sort(idx_val)
+        pos_tr, pos_val = np.sort(pos_tr), np.sort(pos_val)
         print('Grid split - training images: {}   validation images: {}   test images: {}'.format(
-            len(idx_tr), len(idx_val), len(idx_test)))
-        compute_class_weights(y_all[idx_tr], OUTPUTS_a, CLASS_WEIGHTS, verbose=True)
+            len(pos_tr), len(pos_val), len(idx_test)))
+        compute_class_weights(y_train[pos_tr], OUTPUTS_a, CLASS_WEIGHTS, verbose=True)
 
         grid_rows, best = [], None
         for c, cfg in enumerate(configs):
             cols = feature_columns(cfg['FEATURE_GROUPS'])
-            Xc = X_all[:, cols]
+            Xc = X_train_views[:1 + int(cfg['N_AUG_VIEWS'])][:, :, cols]
+            Xv = X_train_tta[:, pos_val][:, :, cols]                    # validation images, TTA views
+            Xt = X_test_views[:, :, cols]
             print('\n==== Grid {}/{}: {} ({} features) ===='.format(c + 1, len(configs), config_text(cfg), len(cols)))
             runs = []
             for seed in GRID_SEEDS:
-                model, history, info = train_one(cfg, Xc[idx_tr], y_all[idx_tr], Xc[idx_val], y_all[idx_val], seed,
+                model, history, info = train_one(cfg, Xc[:, pos_tr], y_train[pos_tr], Xc[0, pos_val],
+                                                 y_train[pos_val], seed,
                                                  label='[{}/{} s{}]'.format(c + 1, len(configs), seed))
-                test = scores(y_all[idx_test], np.argmax(predict_np(model, Xc[idx_test]), axis=1))
-                print('  test (for information only, not used to choose): f1 {:.4f} kappa {:.4f} score {:.4f}'.format(
-                    test['f1_macro'], test['kappa'], test['score']))
-                log_experiment(experiment_row('grid', cfg, info, test, seed))
-                runs.append(info['val']['score'])
+                val_tta = scores(y_train[pos_val], np.argmax(predict_views_logp(model, Xv), axis=1))
+                _, _, test, test_tta = test_scores(model, Xt)
+                print('  validation with {} TTA views: score {:.4f}'.format(len(Xv), val_tta['score']))
+                print('  test (for information only, not used to choose): score {:.4f} | with {} TTA views {:.4f}'.format(
+                    test['score'], len(Xt), test_tta['score']))
+                log_experiment(experiment_row('grid', cfg, info, test, seed, extra={
+                    'val_score_tta': val_tta['score'], 'test_score_tta': test_tta['score']}))
+                runs.append(val_tta['score'] if rank_key == 'val_score_tta' else info['val']['score'])
                 grid_rows.append({'combination': c + 1, 'seed': seed, 'config': config_text(cfg),
                                   'params': model.count_params(), 'epochs_run': info['epochs_run'],
                                   'best_epoch': info['best_epoch'], 'train_acc': info['train_accuracy'],
                                   'val_acc': info['val']['acc'], 'val_score': info['val']['score'],
-                                  'test_score': test['score']})
+                                  'val_score_tta': val_tta['score'], 'test_score': test['score'],
+                                  'test_score_tta': test_tta['score']})
                 del model, history
 
             mean_val = float(np.mean(runs))
             if best is None or mean_val > best['mean_val']:
                 best = {'cfg': cfg, 'mean_val': mean_val, 'combination': c + 1}
-            print('  combination {}: mean val score {:.4f} | leader: combination {} ({:.4f})'.format(
-                c + 1, mean_val, best['combination'], best['mean_val']))
+            print('  combination {}: mean {} {:.4f} | leader: combination {} ({:.4f})'.format(
+                c + 1, rank_key, mean_val, best['combination'], best['mean_val']))
             pd.DataFrame(grid_rows).to_csv(out_file('grid_{}.csv'.format(NICKNAME)), index=False)
+            del Xc, Xv
 
         ranking = pd.DataFrame(grid_rows).groupby(['combination', 'config'], sort=False)[
-            ['params', 'train_acc', 'val_acc', 'val_score', 'test_score']].mean()
-        ranking = ranking.sort_values('val_score', ascending=False)
-        print('\n================ GRID RANKING (mean over seeds, sorted by validation score) ================')
+            ['params', 'train_acc', 'val_acc', 'val_score', 'val_score_tta', 'test_score', 'test_score_tta']].mean()
+        ranking = ranking.sort_values(rank_key, ascending=False)
+        print('\n================ GRID RANKING (mean over seeds, sorted by {}) ================'.format(rank_key))
         print('train_acc much higher than val_acc -> overfitting; both low and close -> underfitting')
-        with pd.option_context('display.width', 250, 'display.max_colwidth', 140):
+        with pd.option_context('display.width', 250, 'display.max_colwidth', 160):
             print(ranking.round(4).to_string())
         best_cfg = best['cfg']
         print('\nBest combination {}: {}'.format(best['combination'], config_text(best_cfg)))
@@ -1097,59 +1328,71 @@ def main():
         best_cfg = configs[0]
 
     cols = feature_columns(best_cfg['FEATURE_GROUPS'])
-    Xb = X_all[:, cols]
-    y_train = y_all[idx_train]
+    Xb = X_train_views[:1 + int(best_cfg['N_AUG_VIEWS'])][:, :, cols]      # [V, n_train, d]
+    Xbv = X_train_tta[:, :, cols]                                          # [TTA_VIEWS, n_train, d]
+    Xbt = X_test_views[:, :, cols]                                         # [TTA_VIEWS, n_test, d]
+    del X_train_views, X_train_tta
 
     #--------------------------------------------------------------------------------------------------------------
     # FINAL MODELS: K-fold cross-validation. Model k: trained on the other folds, early-stopped on fold k.
     print('\n================ FINAL MODELS: {}-fold cross-validation ================'.format(N_FOLDS))
     print('Settings: {}'.format(config_text(best_cfg)))
     skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=CV_SEED)
-    oof_logp = np.zeros((len(idx_train), OUTPUTS_a), np.float64)     # out-of-fold log-probabilities
-    test_logp, models, fold_infos = [], [], []
+    oof_logp = np.zeros((len(idx_train), OUTPUTS_a), np.float64)     # out-of-fold log-probabilities, whole images
+    oof_logp_tta = np.zeros((len(idx_train), OUTPUTS_a), np.float64)  # out-of-fold, mean over the TTA views
+    test_logp, test_logp_tta, models, fold_infos = [], [], [], []
     for k, (pos_tr, pos_val) in enumerate(skf.split(np.zeros(len(idx_train)), y_train), start=1):
-        f_tr, f_val = idx_train[pos_tr], idx_train[pos_val]
         print('\n---- Fold {}/{}: {} training images, {} validation images ----'.format(
-            k, N_FOLDS, len(f_tr), len(f_val)))
-        model, history, info = train_one(best_cfg, Xb[f_tr], y_all[f_tr], Xb[f_val], y_all[f_val], CV_SEED + k,
-                                         label='[fold {}/{}]'.format(k, N_FOLDS))
+            k, N_FOLDS, len(pos_tr), len(pos_val)))
+        model, history, info = train_one(best_cfg, Xb[:, pos_tr], y_train[pos_tr], Xb[0, pos_val], y_train[pos_val],
+                                         CV_SEED + k, label='[fold {}/{}]'.format(k, N_FOLDS))
         if k == 1:
             early_stopping_report(history, 'Fold 1 of {}: {}'.format(N_FOLDS, config_text(best_cfg)))
-        oof_logp[pos_val] = log_softmax_np(predict_np(model, Xb[f_val]))
-        logp_k = log_softmax_np(predict_np(model, Xb[idx_test]))
-        test_logp.append(logp_k)
-        test_k = scores(y_all[idx_test], np.argmax(logp_k, axis=1))
-        print('  test of this model alone (information only): f1 {:.4f} kappa {:.4f} score {:.4f}'.format(
-            test_k['f1_macro'], test_k['kappa'], test_k['score']))
-        log_experiment(experiment_row('cv_fold{}'.format(k), best_cfg, info, test_k, CV_SEED + k))
+        oof_logp[pos_val] = log_softmax_np(predict_np(model, Xb[0, pos_val]))
+        oof_logp_tta[pos_val] = predict_views_logp(model, Xbv[:, pos_val])
+        print('  validation with {} TTA views: score {:.4f}'.format(
+            len(Xbv), scores(y_train[pos_val], np.argmax(oof_logp_tta[pos_val], axis=1))['score']))
+        lp1, lpt, test_k, test_k_tta = test_scores(model, Xbt)
+        test_logp.append(lp1)
+        test_logp_tta.append(lpt)
+        print('  test of this model alone (information only): score {:.4f} | with {} TTA views {:.4f}'.format(
+            test_k['score'], len(Xbt), test_k_tta['score']))
+        log_experiment(experiment_row('cv_fold{}'.format(k), best_cfg, info, test_k, CV_SEED + k,
+                                      extra={'test_score_tta': test_k_tta['score']}))
         models.append(model)
         fold_infos.append(info)
         del history
 
     #--------------------------------------------------------------------------------------------------------------
     # CLASS BIAS on the out-of-fold predictions (every training image predicted by the model that did not train on it)
-    oof_before = scores(y_train, np.argmax(oof_logp, axis=1))
-    print('\n================ CLASS BIAS ================')
-    print('Out-of-fold ({} training images): f1 {:.4f} kappa {:.4f} acc {:.4f} score {:.4f}'.format(
-        len(idx_train), oof_before['f1_macro'], oof_before['kappa'], oof_before['acc'], oof_before['score']))
+    ## with TTA, as the submitted models predict
+    oof_single = scores(y_train, np.argmax(oof_logp, axis=1))
+    oof_before = scores(y_train, np.argmax(oof_logp_tta, axis=1))
+    print('\n================ OUT-OF-FOLD + CLASS BIAS ================')
+    print('Out-of-fold ({} training images): whole image score {:.4f} | with {} TTA views: f1 {:.4f} kappa {:.4f} '
+          'acc {:.4f} score {:.4f}'.format(len(idx_train), oof_single['score'], TTA_VIEWS, oof_before['f1_macro'],
+                                           oof_before['kappa'], oof_before['acc'], oof_before['score']))
     if TUNE_BIAS:
-        bias, s0, s1 = tune_class_bias(oof_logp, y_train, OUTPUTS_a)
+        bias, s0, s1 = tune_class_bias(oof_logp_tta, y_train, OUTPUTS_a)
         print('Bias per class: {}'.format('  '.join('{} {:+.2f}'.format(c, x) for c, x in zip(class_names, bias))))
         print('Out-of-fold score {:.4f} -> {:.4f} (measured on the images it was tuned on: the real gain is smaller)'.format(
             s0, s1))
     else:
         bias = np.zeros(OUTPUTS_a)
         print('TUNE_BIAS = False: no bias')
-    oof_after = scores(y_train, np.argmax(oof_logp + bias, axis=1))
+    oof_after = scores(y_train, np.argmax(oof_logp_tta + bias, axis=1))
 
     ens_logp = np.mean(test_logp, axis=0)
-    t_plain = scores(y_all[idx_test], np.argmax(ens_logp, axis=1))
-    t_bias = scores(y_all[idx_test], np.argmax(ens_logp + bias, axis=1))
-    print('Test (information only, not used to choose): ensemble {:.4f} | ensemble + bias {:.4f}'.format(
-        t_plain['score'], t_bias['score']))
+    ens_logp_tta = np.mean(test_logp_tta, axis=0)
+    t_plain = scores(y_test, np.argmax(ens_logp, axis=1))
+    t_tta = scores(y_test, np.argmax(ens_logp_tta, axis=1))
+    t_final = scores(y_test, np.argmax(ens_logp_tta + bias, axis=1))
+    print('Test (information only, not used to choose): ensemble {:.4f} | ensemble + {} TTA views {:.4f}{}'.format(
+        t_plain['score'], TTA_VIEWS, t_tta['score'],
+        ' | + bias {:.4f}'.format(t_final['score']) if TUNE_BIAS else ''))
 
     #--------------------------------------------------------------------------------------------------------------
-    # SAVE: bias added to the output layer, fresh optimizer (small files), model_<NICKNAME>1..K.keras
+    # SAVE: bias added to the output layer, weights only (small files), model_<NICKNAME>1..K.keras
     print('\n================ SAVING ================')
     old = [f for f in os.listdir(OUT_DIR) if re.fullmatch(r'model_{}(\d+)\.keras'.format(re.escape(NICKNAME)), f)
            and int(re.fullmatch(r'model_{}(\d+)\.keras'.format(re.escape(NICKNAME)), f).group(1)) > N_FOLDS]
@@ -1175,15 +1418,16 @@ def main():
     print('\n================ TEST (saved models, as test_{}.py) ================'.format(NICKNAME))
     saved = [tf.keras.models.load_model(f) for f in model_files]
     save_model([(os.path.basename(f), m) for f, m in zip(model_files, saved)])
-    saved_logp = np.mean([log_softmax_np(predict_np(m, Xb[idx_test])) for m in saved], axis=0)
+    saved_logp = np.mean([predict_views_logp(m, Xbt) for m in saved], axis=0)     # models x TTA views
     pred = np.argmax(saved_logp, axis=1)
-    same = float(np.mean(pred == np.argmax(ens_logp + bias, axis=1)))
-    print('Check: saved models give the same predictions as ensemble + bias for {:.2%} of the test images'.format(same))
+    same = float(np.mean(pred == np.argmax(ens_logp_tta + bias, axis=1)))
+    print('Check: saved models give the same predictions as the ensemble in memory for {:.2%} of the test images'.format(
+        same))
 
     xdf_dset = xdf_data.iloc[idx_test].copy()
     predict_func(pred)
     values = metrics_func(['f1_macro', 'coh', 'acc'], ['avg'])
-    final_test = scores(y_all[idx_test], pred)
+    final_test = scores(y_test, pred)
     print('Leaderboard formula (F1 + kappa)/2 on test: {:.4f}'.format(final_test['score']))
 
     final_info = {'epochs_run': float(np.mean([i['epochs_run'] for i in fold_infos])),
@@ -1192,7 +1436,9 @@ def main():
                   'val': {'f1_macro': oof_after['f1_macro'], 'kappa': oof_after['kappa'], 'acc': oof_after['acc'],
                           'score': oof_after['score']}}
     log_experiment(experiment_row('final_ensemble', best_cfg, final_info, final_test, CV_SEED, extra={
-        'n_models': N_FOLDS, 'oof_score_no_bias': oof_before['score'], 'test_score_no_bias': t_plain['score'],
+        'n_models': N_FOLDS, 'oof_score_no_bias': oof_before['score'], 'oof_score_no_tta': oof_single['score'],
+        'test_score_no_tta': t_plain['score'],
+        'test_score_tta': t_tta['score'],
         'bias': ' '.join('{:+.2f}'.format(x) for x in bias)}))
     print('Run logged in', out_file('experiments_{}.csv'.format(NICKNAME)),
           ('and ' + out_file('grid_{}.csv'.format(NICKNAME))) if run_grid else '')
