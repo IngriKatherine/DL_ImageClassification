@@ -46,6 +46,8 @@ def test():
         Test-time augmentation of feature models: the model predicts the whole image and the crops of TTA_CROPS
         (t5 = whole image + 4 corner crops of 80%), and its log-probabilities are averaged over the views. Names
         without _t (older models) use the whole image only.
+        The models of an ensemble can use different feature groups and decode ratios: for every ratio the features of
+        all the groups its models need are computed ONCE per view, and every model takes its own columns.
 
         PIXEL models (older, name like MLP_Matthew_flip_hv_prep_r8_aa):
         Image preparation is identical to train_Matthew.py, and is read from each model, so it can never mismatch:
@@ -76,16 +78,18 @@ def test():
     ## it is on the leaf. Groups are always computed and concatenated in the order of FEATURE_ORDER.
     ## Histograms are square-rooted (Hellinger / power normalization: rare lesion colours and textures count more).
     ## LBP codes are grouped into the 51 classes that stay the same when the leaf is flipped or turned by 90 degrees.
-    ## Version 2 (10/30/2026): new groups 'lab' and 'tile', test-time crops TTA_CROPS. The version 1 groups are computed
-    ## exactly as in version 1, so models of both versions are accepted (FEATURE_VERSIONS_OK).
+    ## Version 2 (10/30/2026): new groups 'lab' and 'tile', test-time crops TTA_CROPS.
+    ## Version 3 (10/30/2026 pm): new group 'spread'. The groups of older versions are computed exactly as before, so
+    ## models of every version in FEATURE_VERSIONS_OK are accepted.
     ## Change FEATURE_VERSION whenever this block changes: test_Matthew.py refuses a model made with another version.
-    FEATURE_VERSION = 2
-    FEATURE_VERSIONS_OK = (1, 2)
-    FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile')
+    FEATURE_VERSION = 3
+    FEATURE_VERSIONS_OK = (1, 2, 3)
+    FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile', 'spread')
     FEATURE_SIZE = {'hs': 288, 'v': 16, 'mom': 12, 'exr': 64, 'lbp': 51, 'lbp2': 51, 'lbp4': 51, 'grad': 16,
-                    'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403}
+                    'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403, 'spread': 98}
     SQRT_GROUPS = ('hs', 'v', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'lab', 'tile')
     TILE_GRID = 4                # 'tile': the image is cut into TILE_GRID x TILE_GRID tiles
+    SPREAD_GRID = 6              # 'spread': 6 x 6 tiles
     ## Test-time augmentation views: (crop scale, vertical position, horizontal position), position 0 = top / left,
     ## 1 = bottom / right. View 0 is the whole image; the model name says how many views are used (..._t5).
     TTA_CROPS = ((1.0, 0.5, 0.5), (0.8, 0.0, 0.0), (0.8, 0.0, 1.0), (0.8, 1.0, 0.0), (0.8, 1.0, 1.0))
@@ -211,6 +215,18 @@ def test():
         return tf.reduce_max(c, axis=0)
 
 
+    def _lab_words(img):
+        '''
+            48 coarse colour words per pixel: L* (dark < 40 < mid < 65 < light) x a* (< -20 < -10 < 0 <) x
+            b* (< 15 < 30 < 45 <). E.g. deep green leaf, yellowing, brown / orange lesion (a* > 0), dark spot, white powder
+        '''
+        lab_l, lab_a, lab_b = _rgb_to_lab(img)
+        lc = tf.add_n([tf.cast(lab_l > e, tf.int32) for e in (40.0, 65.0)])
+        ac = tf.add_n([tf.cast(lab_a > e, tf.int32) for e in (-20.0, -10.0, 0.0)])
+        bc = tf.add_n([tf.cast(lab_b > e, tf.int32) for e in (15.0, 30.0, 45.0)])
+        return lc * 16 + ac * 4 + bc
+
+
     def decode_image(file_path, ratio):
         '''
             reads a JPEG and decodes it directly at 1/ratio of its size (4000x2672 -> 500x334 with ratio 8)
@@ -296,6 +312,25 @@ def test():
                                      _tile_max(_value_codes(r_t - g_t, 32, -0.4, 0.4), 32),
                                      _tile_max(_value_codes(2 * g_t - r_t - b_t, 32, -0.4, 0.8), 32),
                                      _tile_max(_lbp_codes(gray), 51)], 0)
+
+        if 'spread' in need:
+            # HOW WIDELY each colour is spread and HOW MANY different colours there are (several lesion types on one
+            # leaf, e.g. a "mixed" class). For each of the 48 colour words: the fraction of the 6 x 6 tiles where it
+            # covers at least 1% of the tile (48) and the square root of its fraction of the image (48); then the
+            # entropy of the word histogram and the fraction of words covering at least 0.5% of the image (2)   -> 98
+            words = _lab_words(img)
+            hh, ww = tf.shape(words)[0], tf.shape(words)[1]
+            k = SPREAD_GRID * SPREAD_GRID
+            tile = (tf.range(hh) * SPREAD_GRID // hh)[:, None] * SPREAD_GRID + (tf.range(ww) * SPREAD_GRID // ww)[None, :]
+            cnt = tf.math.bincount(tf.reshape(tile * 48 + words, [-1]), minlength=k * 48, maxlength=k * 48,
+                                   dtype=tf.float32)
+            cnt = tf.reshape(cnt, [k, 48])
+            cnt = cnt / tf.maximum(tf.reduce_sum(cnt, axis=1, keepdims=True), 1.0)
+            present = tf.reduce_mean(tf.cast(cnt >= 0.01, tf.float32), axis=0)
+            p = _counts(words, 48)
+            entropy = -tf.reduce_sum(p * tf.math.log(tf.maximum(p, 1e-12))) / np.log(48.0)
+            n_words = tf.reduce_mean(tf.cast(p >= 0.005, tf.float32))
+            out['spread'] = tf.concat([present, tf.sqrt(p), tf.stack([entropy, n_words])], 0)
 
         return tf.concat([tf.sqrt(out[k]) if k in SQRT_GROUPS else out[k] for k in groups], axis=0)
     #------------------------------------------------------------------------------------------------------------------
@@ -504,6 +539,18 @@ def test():
         return final_ds.batch(BATCH_SIZE).prefetch(AUTOTUNE)
 
     #--------------------------------------------------------------------------------------------------------------
+    feature_union = {}     # decode ratio -> sorted feature groups needed by the models of that ratio
+
+    def group_columns(groups, union):
+        '''
+            positions of the columns of `groups` inside a feature vector of the groups `union` (both sorted)
+        '''
+        start, pos = 0, {}
+        for g in union:
+            pos[g] = np.arange(start, start + FEATURE_SIZE[g])
+            start += FEATURE_SIZE[g]
+        return np.concatenate([pos[g] for g in groups])
+
     def model_proba(final_model, mf):
         '''
             softmax output of one model for every image of the split (in the order of the rows)
@@ -515,9 +562,11 @@ def test():
             # feature model: colour + texture histograms -> model (features computed once, shared by the models)
             # with test-time augmentation: mean of the log-probabilities over the views, normalized again
             ratio, groups, views = feat
+            union = feature_union[ratio]
+            cols = group_columns(groups, union)
             logp = 0.0
             for v in range(views):
-                X = feature_matrix(ratio, groups, v)
+                X = feature_matrix(ratio, union, v)[:, cols]
                 if X.shape[1] != n_inputs:
                     raise ValueError('{} expects {} inputs, the features have {}'.format(mf, n_inputs, X.shape[1]))
                 p = np.asarray(final_model.predict(X, batch_size=1024, verbose=0))
@@ -549,9 +598,14 @@ def test():
     os.environ['COLUMNS'] = '80'   # same summary width as an automated run (no terminal)
     summary_lines = ['Ensemble of {} model(s), prediction = geometric mean of their softmax outputs'.format(
         len(model_files)), '']
+    loaded = [(mf, tf.keras.models.load_model(mf)) for mf in model_files]
+    for mf, final_model in loaded:
+        feat = features_of(final_model)
+        if feat is not None:
+            feature_union[feat[0]] = sort_feature_groups(sorted(set(feature_union.get(feat[0], [])) | set(feat[1])))
+
     sum_logp = None
-    for mf in model_files:
-        final_model = tf.keras.models.load_model(mf)
+    for mf, final_model in loaded:
         summary_lines.append('==== {} ===='.format(os.path.basename(mf)))
         final_model.summary(print_fn=lambda x, **kwargs: summary_lines.append(x))
         summary_lines.append('')
@@ -560,8 +614,7 @@ def test():
         if sum_logp is not None and logp.shape != sum_logp.shape:
             raise ValueError('{} has {} outputs, the other models {}'.format(mf, logp.shape[1], sum_logp.shape[1]))
         sum_logp = logp if sum_logp is None else sum_logp + logp
-        del final_model
-        tf.keras.backend.clear_session()
+    del loaded
 
     # summary_<nickname>.txt written from the loaded models, as save_model() in test_to_do.py
     for d in local_dirs:

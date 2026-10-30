@@ -6,6 +6,7 @@ import re
 import argparse
 import itertools
 import zlib
+import shutil
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -18,6 +19,22 @@ from tensorflow.keras.utils import to_categorical
 
 '''
 Based on train_example.py (LSDR) and train_Matthew.py
+10/30/2026 evening: PUSH TOWARDS 0.9 (10/30 pm run: test 0.883; class1 F1 0.80 vs 0.90-0.93 for the others)
+            1. EARLY STOPPING on the validation score (patience 20) instead of the validation loss: in the 10/30 pm run
+               the loss was lowest at epoch 23 while the score still improved until epoch 51.
+               The learning rate is still lowered on the validation loss (LR_MONITOR).
+            2. MORE AUGMENTED VIEWS: N_AUG_VIEWS = 8 (views 1-4 are the cached ones of the 10/30 pm run).
+            3. MIXUP (Zhang et al., 2018) on the feature vectors + LABEL SMOOTHING 0.1 (Szegedy et al., 2016):
+               the network is trained on blends of two images with blended targets -> less memorization.
+            4. DIVERSE ENSEMBLE: the best ENSEMBLE_CANDIDATES grid combinations (different feature sets / resolutions)
+               are each trained on the K folds; their out-of-fold predictions decide which ones join the ensemble
+               (greedy forward selection, Caruana et al., 2004). All models are averaged in test_Matthew.py.
+            5. HIGHER RESOLUTION: FEATURE_RATIO is a grid setting; ratio 4 = 1000x668 (small spots are 2x larger).
+            6. NEW FEATURE GROUP 'spread' (FEATURE_VERSION 3): 48 coarse Lab colour words; for each, the fraction of
+               the 6x6 tiles it appears in, plus its share of the image, the entropy and the number of colours present
+               -> how many different lesion colours a leaf has and how widely they spread (aimed at class1).
+            - Feature caches are stored per pack (v2 groups / v3 group), so the 10/30 pm caches are reused.
+            - Before saving, the model files already in the folder are moved to previous_models/<date_time>/.
 10/30/2026 pm: FEATURE AUGMENTATION + TEST-TIME CROPS (suggestion 3) + LESION FEATURES (suggestion 4)
             - Diagnosis of the 10/30 run: train accuracy 0.996 vs validation 0.875, and 0.6M / 1.6M / 4.6M weights
               all gave the same validation score -> the network memorizes the training images; it needs more varied
@@ -89,8 +106,9 @@ NICKNAME = 'Matthew'
 ##  'lab' CIE L*a*b* histograms (272)               'tile' max over 4x4 tiles of hs + exr + lbp histograms (403)
 ## 240-image test: all groups but 'thumb' was the best set (thumbnail = raw pixels again, it lowered the score)
 FEATURES_V1 = ['hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr']      # the 10/30 set (904 features)
-FEATURE_GROUPS = FEATURES_V1 + ['lab', 'tile']
-FEATURE_RATIO = 8            # JPEG decoded at 1/8 size (500x334). Ratio 4 (1000x668) was not better and is 3x slower
+FEATURE_GROUPS = FEATURES_V1 + ['lab', 'tile', 'spread']
+##  'spread' how widely each of 48 Lab colour words spreads over 6x6 tiles + number of colours (98)
+FEATURE_RATIO = 8            # JPEG decoded at 1/8 size (500x334); 4 = 1000x668, about 3x slower. Grid setting too
 EXTRACT_PARALLEL = 0         # images processed at the same time: 0 = automatic (all CPU cores), n = n images
 EXTRACT_BATCH = 64
 CACHE_DIR = 'features_cache' # folder next to this file; delete it to recompute the features
@@ -107,7 +125,9 @@ INPUT_DROPOUT = 0.0                # dropout on the normalized features themselv
 WEIGHT_DECAY = 0.0                 # L2 penalty on every Dense kernel (0 = off)
 ## (hidden / dropout / weight decay = best combination of the 10/30 grid)
 KERNEL_INIT = 'he_normal'          # Kaiming init for ReLU (book Eq. 4.34)
-LABEL_SMOOTHING = 0.0              # e.g. 0.1: targets 0.9 / 0.02 instead of 1 / 0 (0 = off)
+LABEL_SMOOTHING = 0.1              # targets 0.917 / 0.017 instead of 1 / 0 (0 = off)
+MIXUP_ALPHA = 0.2                  # mixup: each training example is blended with another one of the batch,
+                                   # weight lambda ~ Beta(alpha, alpha) (kept >= 0.5); 0 = off
 
 ## ---- Training --------------------------------------------------------------------------------------------------
 n_epoch = 300                # upper limit, early stopping ends the run before
@@ -126,10 +146,11 @@ SEED = 42
 ## Early stopping (NND2 Ch.13): stop when the validation error F has not improved for EARLY_STOP_PATIENCE epochs.
 ## The weights kept are those of the epoch with the best CHECKPOINT_MONITOR.
 ##  'val_score' = (macro F1 + Cohen kappa) / 2 on validation = leaderboard formula
-EARLY_STOP_MONITOR = 'val_loss'
-EARLY_STOP_PATIENCE = 30
+EARLY_STOP_MONITOR = 'val_score'   # 10/30 pm: the loss stopped improving long before the score did
+EARLY_STOP_PATIENCE = 20
 CHECKPOINT_MONITOR = 'val_score'   # 'val_score' | 'val_loss' | 'val_f1_macro' | 'val_kappa' | 'val_accuracy'
-LR_SCHEDULE = 'plateau'            # alpha x LR_FACTOR after LR_PATIENCE epochs without a better val_loss
+LR_SCHEDULE = 'plateau'            # alpha x LR_FACTOR after LR_PATIENCE epochs without a better LR_MONITOR
+LR_MONITOR = 'val_loss'
 LR_FACTOR = 0.5
 LR_PATIENCE = 8
 LR_MIN = 1e-6
@@ -140,7 +161,7 @@ PRINT_EVERY = 10                   # print one line every PRINT_EVERY epochs (an
 ## N_AUG_VIEWS x 4 min). Each view: random crop of AUG_SCALE of the height and of the width at a random position, then
 ## a small random change of brightness, contrast and saturation (no hue change: colour is the main signal). The same
 ## image always gets the same views (seeded by its name), so the cache stays valid. 0 = no augmentation.
-N_AUG_VIEWS = 4
+N_AUG_VIEWS = 8
 AUG_SEED = 2026
 AUG_SCALE = (0.6, 1.0)
 AUG_BRIGHTNESS = 0.08        # random value in [-0.08, 0.08] added to the pixels (0..1)
@@ -158,20 +179,41 @@ TTA_VIEWS = 5
 ## Every combination is trained on the same train/validation split (VAL_FRACTION, SEED) and logged to
 ## grid_<NICKNAME>.csv and experiments_<NICKNAME>.csv. The best mean validation (F1 + kappa)/2 wins.
 ## Allowed keys: the setting names above (HIDDEN_LAYERS, DROPOUT_RATE, INPUT_DROPOUT, WEIGHT_DECAY, USE_BATCHNORM,
-## LEARNING_RATE, BATCH_SIZE, CLASS_WEIGHTS, LABEL_SMOOTHING, FEATURE_GROUPS, ACTIVATION, OPTIMIZER, N_AUG_VIEWS).
+## LEARNING_RATE, BATCH_SIZE, CLASS_WEIGHTS, LABEL_SMOOTHING, FEATURE_GROUPS, ACTIVATION, OPTIMIZER, N_AUG_VIEWS,
+## FEATURE_RATIO, MIXUP_ALPHA).
+## GRID can be a dict (every combination of its lists) or a LIST of dicts (exactly these combinations; the settings not
+## given come from above).
 ## Ranking: validation (F1 + kappa)/2 with TTA (TTA_VIEWS > 1); the epoch kept is chosen on the whole images.
 ## The test score is printed with and without TTA (information only).
-## GRID = {} -> one run with the settings above.
+## GRID = {} or [] -> one run with the settings above.
 ## Reading the result (train accuracy is measured on the training part, inference mode):
 ##   train and validation both low and close   -> too simple / too regularized: wider, deeper, less dropout
 ##   train much higher than validation (>0.15) -> overfitting: more dropout / weight decay, or smaller
-GRID = {
-    'FEATURE_GROUPS': [FEATURES_V1, FEATURES_V1 + ['lab'], FEATURES_V1 + ['tile'], FEATURES_V1 + ['lab', 'tile']],
-    'N_AUG_VIEWS': [0, 4],
-}
+GRID = [
+    ## reference: the 10/30 pm winner (validation with TTA 0.868), only the early stopping is new
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile'], N_AUG_VIEWS=4, MIXUP_ALPHA=0.0,
+         LABEL_SMOOTHING=0.0),
+    ## + 8 augmented views
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile'], N_AUG_VIEWS=8, MIXUP_ALPHA=0.0,
+         LABEL_SMOOTHING=0.0),
+    ## + mixup and label smoothing
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile'], N_AUG_VIEWS=8, MIXUP_ALPHA=0.2,
+         LABEL_SMOOTHING=0.1),
+    ## + 'spread'
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread'], N_AUG_VIEWS=8, MIXUP_ALPHA=0.2,
+         LABEL_SMOOTHING=0.1),
+    ## a different feature set (diversity for the ensemble)
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread'], N_AUG_VIEWS=8, MIXUP_ALPHA=0.2,
+         LABEL_SMOOTHING=0.1),
+    ## higher resolution (ratio 4: ~1.7 h of feature extraction the first time, fewer augmented views to save time)
+    dict(FEATURE_RATIO=4, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread'], N_AUG_VIEWS=2, MIXUP_ALPHA=0.2,
+         LABEL_SMOOTHING=0.1),
+    dict(FEATURE_RATIO=4, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile'], N_AUG_VIEWS=2, MIXUP_ALPHA=0.2,
+         LABEL_SMOOTHING=0.1),
+]
 ## each combination is trained once per seed and the validation scores are averaged (differences below ~0.01 between
 ## two combinations are within the noise of one seed: use 2-3 seeds to separate close ones)
-## The best combination is then used for the K-fold final models below (GRID = {} -> the settings above, no grid run)
+## The best combinations are then used for the K-fold final models below (GRID = {} -> the settings above, no grid)
 GRID_SEEDS = [42]
 
 ## ---- Final models: K-fold cross-validation ensemble (suggestions 1 + 2) -----------------------------------------
@@ -179,6 +221,14 @@ GRID_SEEDS = [42]
 ## are deleted, so the folder only holds the models of this run (test_Matthew.py loads every numbered file)
 N_FOLDS = 5
 CV_SEED = 42                 # split of the folds; model k uses seed CV_SEED + k (initial weights, shuffling)
+## Diverse ensemble: the ENSEMBLE_CANDIDATES best grid combinations (with ENSEMBLE_DISTINCT_FEATURES: at most one per
+## feature set + resolution) are all trained on the N_FOLDS folds. Starting from the best, a candidate joins the
+## ensemble only if it raises the out-of-fold score (with TTA) by more than ENSEMBLE_MIN_GAIN.
+## Saved: N_FOLDS models per chosen candidate (e.g. 3 x 5 = 15 files, ~9-10 MB each).
+ENSEMBLE_CANDIDATES = 3
+ENSEMBLE_DISTINCT_FEATURES = True
+ENSEMBLE_MIN_GAIN = 0.0
+BACKUP_PREVIOUS_MODELS = True    # move model files already in the folder to previous_models/<date_time>/ first
 
 ## ---- Class bias tuning on the out-of-fold predictions (suggestion 5) --------------------------------------------
 TUNE_BIAS = False            # 10/30 run: 0.8589 without, 0.8581 with -> off
@@ -200,7 +250,7 @@ DATA_DIR = PATH + os.path.sep + 'Data' + os.path.sep
 
 GRID_KEYS = ('HIDDEN_LAYERS', 'DROPOUT_RATE', 'INPUT_DROPOUT', 'WEIGHT_DECAY', 'USE_BATCHNORM', 'LEARNING_RATE',
              'BATCH_SIZE', 'CLASS_WEIGHTS', 'LABEL_SMOOTHING', 'FEATURE_GROUPS', 'ACTIVATION', 'OPTIMIZER',
-             'N_AUG_VIEWS')
+             'N_AUG_VIEWS', 'FEATURE_RATIO', 'MIXUP_ALPHA')
 MONITORS = ('val_score', 'val_loss', 'val_f1_macro', 'val_kappa', 'val_accuracy')
 
 
@@ -215,16 +265,18 @@ def out_file(name):
 ## it is on the leaf. Groups are always computed and concatenated in the order of FEATURE_ORDER.
 ## Histograms are square-rooted (Hellinger / power normalization: rare lesion colours and textures count more).
 ## LBP codes are grouped into the 51 classes that stay the same when the leaf is flipped or turned by 90 degrees.
-## Version 2 (10/30/2026): new groups 'lab' and 'tile', test-time crops TTA_CROPS. The version 1 groups are computed
-## exactly as in version 1, so models of both versions are accepted (FEATURE_VERSIONS_OK).
+## Version 2 (10/30/2026): new groups 'lab' and 'tile', test-time crops TTA_CROPS.
+## Version 3 (10/30/2026 pm): new group 'spread'. The groups of older versions are computed exactly as before, so
+## models of every version in FEATURE_VERSIONS_OK are accepted.
 ## Change FEATURE_VERSION whenever this block changes: test_Matthew.py refuses a model made with another version.
-FEATURE_VERSION = 2
-FEATURE_VERSIONS_OK = (1, 2)
-FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile')
+FEATURE_VERSION = 3
+FEATURE_VERSIONS_OK = (1, 2, 3)
+FEATURE_ORDER = ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile', 'spread')
 FEATURE_SIZE = {'hs': 288, 'v': 16, 'mom': 12, 'exr': 64, 'lbp': 51, 'lbp2': 51, 'lbp4': 51, 'grad': 16,
-                'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403}
+                'ctr': 355, 'thumb': 768, 'lab': 272, 'tile': 403, 'spread': 98}
 SQRT_GROUPS = ('hs', 'v', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'lab', 'tile')
 TILE_GRID = 4                # 'tile': the image is cut into TILE_GRID x TILE_GRID tiles
+SPREAD_GRID = 6              # 'spread': 6 x 6 tiles
 ## Test-time augmentation views: (crop scale, vertical position, horizontal position), position 0 = top / left,
 ## 1 = bottom / right. View 0 is the whole image; the model name says how many views are used (..._t5).
 TTA_CROPS = ((1.0, 0.5, 0.5), (0.8, 0.0, 0.0), (0.8, 0.0, 1.0), (0.8, 1.0, 0.0), (0.8, 1.0, 1.0))
@@ -350,6 +402,18 @@ def _tile_max(idx, n):
     return tf.reduce_max(c, axis=0)
 
 
+def _lab_words(img):
+    '''
+        48 coarse colour words per pixel: L* (dark < 40 < mid < 65 < light) x a* (< -20 < -10 < 0 <) x
+        b* (< 15 < 30 < 45 <). E.g. deep green leaf, yellowing, brown / orange lesion (a* > 0), dark spot, white powder
+    '''
+    lab_l, lab_a, lab_b = _rgb_to_lab(img)
+    lc = tf.add_n([tf.cast(lab_l > e, tf.int32) for e in (40.0, 65.0)])
+    ac = tf.add_n([tf.cast(lab_a > e, tf.int32) for e in (-20.0, -10.0, 0.0)])
+    bc = tf.add_n([tf.cast(lab_b > e, tf.int32) for e in (15.0, 30.0, 45.0)])
+    return lc * 16 + ac * 4 + bc
+
+
 def decode_image(file_path, ratio):
     '''
         reads a JPEG and decodes it directly at 1/ratio of its size (4000x2672 -> 500x334 with ratio 8)
@@ -436,6 +500,25 @@ def image_features(img, groups):
                                  _tile_max(_value_codes(2 * g_t - r_t - b_t, 32, -0.4, 0.8), 32),
                                  _tile_max(_lbp_codes(gray), 51)], 0)
 
+    if 'spread' in need:
+        # HOW WIDELY each colour is spread and HOW MANY different colours there are (several lesion types on one
+        # leaf, e.g. a "mixed" class). For each of the 48 colour words: the fraction of the 6 x 6 tiles where it
+        # covers at least 1% of the tile (48) and the square root of its fraction of the image (48); then the
+        # entropy of the word histogram and the fraction of words covering at least 0.5% of the image (2)   -> 98
+        words = _lab_words(img)
+        hh, ww = tf.shape(words)[0], tf.shape(words)[1]
+        k = SPREAD_GRID * SPREAD_GRID
+        tile = (tf.range(hh) * SPREAD_GRID // hh)[:, None] * SPREAD_GRID + (tf.range(ww) * SPREAD_GRID // ww)[None, :]
+        cnt = tf.math.bincount(tf.reshape(tile * 48 + words, [-1]), minlength=k * 48, maxlength=k * 48,
+                               dtype=tf.float32)
+        cnt = tf.reshape(cnt, [k, 48])
+        cnt = cnt / tf.maximum(tf.reduce_sum(cnt, axis=1, keepdims=True), 1.0)
+        present = tf.reduce_mean(tf.cast(cnt >= 0.01, tf.float32), axis=0)
+        p = _counts(words, 48)
+        entropy = -tf.reduce_sum(p * tf.math.log(tf.maximum(p, 1e-12))) / np.log(48.0)
+        n_words = tf.reduce_mean(tf.cast(p >= 0.005, tf.float32))
+        out['spread'] = tf.concat([present, tf.sqrt(p), tf.stack([entropy, n_words])], 0)
+
     return tf.concat([tf.sqrt(out[k]) if k in SQRT_GROUPS else out[k] for k in groups], axis=0)
 #------------------------------------------------------------------------------------------------------------------
 
@@ -497,51 +580,77 @@ def extract_features(paths, seeds, groups, ratio, view):
     return np.concatenate(out, axis=0).astype(np.float32)
 #------------------------------------------------------------------------------------------------------------------
 
-def load_feature_cache(ids, view='orig'):
+## the cache is stored in packs: the groups of FEATURE_VERSION 2 (file names as in the 10/30 pm run, so those files are
+## reused) and the group added in version 3. Packs are concatenated in FEATURE_ORDER.
+FEATURE_PACKS = (('v2', ('hs', 'v', 'mom', 'exr', 'lbp', 'lbp2', 'lbp4', 'grad', 'ctr', 'thumb', 'lab', 'tile')),
+                 ('v3', ('spread',)))
+assert tuple(g for _, gs in FEATURE_PACKS for g in gs) == FEATURE_ORDER
+
+
+def load_feature_cache(ids, view='orig', ratio=None):
     '''
         features of ALL groups (FEATURE_ORDER) of one view of the image ids, from features_cache/ when available.
-        Only the images missing from the cache are computed.
-          'orig'   whole image (all rows; first run ~14,700 images)
+        Only the images missing from the cache are computed (packs missing for the same images in one pass).
+          'orig'   whole image (all rows)
           'aug<j>' random training view j (training rows). The file name holds a code of the AUG_* settings, so
                    changing them makes new views instead of reusing old ones
           'tta<j>' test-time crop j (all rows: validation with TTA in the grid / folds, test rows)
+        ratio: JPEG decode ratio (default FEATURE_RATIO)
         Returns [len(ids), sum of all FEATURE_SIZE]
     '''
+    ratio = FEATURE_RATIO if ratio is None else ratio
     folder = os.path.join(SCRIPT_DIR, CACHE_DIR)
     os.makedirs(folder, exist_ok=True)
     tag = view
     if view.startswith('aug'):
         tag += '_{:08x}'.format(zlib.crc32(repr((AUG_SEED, tuple(AUG_SCALE), AUG_BRIGHTNESS, AUG_CONTRAST,
                                                  AUG_SATURATION)).encode()))
-    file_name = os.path.join(folder, 'features_r{}_v{}_{}.npz'.format(FEATURE_RATIO, FEATURE_VERSION, tag))
-    n_all = sum(FEATURE_SIZE[g] for g in FEATURE_ORDER)
+    unique_ids = list(dict.fromkeys(ids))
 
-    cached_ids, cached_X = np.array([], dtype=object), np.zeros((0, n_all), np.float32)
-    if os.path.exists(file_name):
-        z = np.load(file_name, allow_pickle=True)
-        if z['X'].shape[1] == n_all:
-            cached_ids, cached_X = z['ids'], z['X']
-        else:
-            print('Feature cache has another layout, it is recomputed')
+    packs = []
+    for pack, groups in FEATURE_PACKS:
+        file_name = os.path.join(folder, 'features_r{}_{}_{}.npz'.format(ratio, pack, tag))
+        n = sum(FEATURE_SIZE[g] for g in groups)
+        cached_ids, cached_X = np.array([], dtype=object), np.zeros((0, n), np.float32)
+        if os.path.exists(file_name):
+            z = np.load(file_name, allow_pickle=True)
+            if z['X'].shape[1] == n:
+                cached_ids, cached_X = z['ids'], z['X']
+            else:
+                print('Feature cache {} has another layout, it is recomputed'.format(file_name))
+        position = {k: i for i, k in enumerate(cached_ids)}
+        packs.append({'file': file_name, 'groups': groups, 'ids': cached_ids, 'X': cached_X, 'position': position,
+                      'missing': [i for i in unique_ids if i not in position]})
 
-    position = {k: i for i, k in enumerate(cached_ids)}
-    missing = [i for i in dict.fromkeys(ids) if i not in position]     # unique ids, in order
-    if missing:
-        print('Computing the features of {} images, view {} (ratio {}, all groups, cached in {}) ...'.format(
-            len(missing), view, FEATURE_RATIO, file_name))
+    ## packs missing the same images are computed together (one JPEG decode)
+    todo = {}
+    for pk in packs:
+        if pk['missing']:
+            todo.setdefault(tuple(pk['missing']), []).append(pk)
+    for missing, pks in todo.items():
+        groups = sort_feature_groups([g for pk in pks for g in pk['groups']])
+        print('Computing the features of {} images, view {}, ratio {}, groups {} ...'.format(
+            len(missing), view, ratio, '-'.join(groups)))
         j = int(view[3:]) if view[3:].isdigit() else 0
         seeds = [[AUG_SEED * 1000 + j, zlib.crc32(i.encode())] for i in missing]   # same image -> same view
-        X_new = extract_features([DATA_DIR + i for i in missing], seeds, list(FEATURE_ORDER), FEATURE_RATIO, view)
+        X_new = extract_features([DATA_DIR + i for i in missing], seeds, groups, ratio, view)
         if not np.all(np.isfinite(X_new)):
             raise ValueError('NaN/inf in the features of some images')
-        cached_ids = np.concatenate([cached_ids, np.array(missing, dtype=object)])
-        cached_X = np.concatenate([cached_X, X_new], axis=0)
-        np.savez(file_name, ids=cached_ids, X=cached_X)
-        position = {k: i for i, k in enumerate(cached_ids)}
-    else:
-        print('Features loaded from', file_name)
+        start = 0
+        for g in groups:                                 # split the columns back into the packs
+            for pk in pks:
+                if g in pk['groups']:
+                    pk.setdefault('new', []).append(X_new[:, start:start + FEATURE_SIZE[g]])
+            start += FEATURE_SIZE[g]
+        for pk in pks:
+            pk['ids'] = np.concatenate([pk['ids'], np.array(missing, dtype=object)])
+            pk['X'] = np.concatenate([pk['X'], np.concatenate(pk.pop('new'), axis=1)], axis=0)
+            np.savez(pk['file'], ids=pk['ids'], X=pk['X'])
+            pk['position'] = {k: i for i, k in enumerate(pk['ids'])}
+    if not todo:
+        print('Features loaded: ratio {}, view {}'.format(ratio, view))
 
-    return cached_X[[position[i] for i in ids]]
+    return np.concatenate([pk['X'][[pk['position'][i] for i in ids]] for pk in packs], axis=1)
 #------------------------------------------------------------------------------------------------------------------
 
 def feature_columns(groups):
@@ -563,25 +672,30 @@ def grid_configs():
     '''
         list of configs, one per combination of the GRID values
     '''
-    for k in GRID:
-        if k not in GRID_KEYS:
-            raise ValueError('GRID key {} not allowed, use one of {}'.format(k, GRID_KEYS))
-    keys = list(GRID.keys())
+    if isinstance(GRID, dict):
+        keys = list(GRID.keys())
+        overrides = [dict(zip(keys, values)) for values in itertools.product(*[GRID[k] for k in keys])]
+    else:
+        overrides = [dict(o) for o in GRID] or [{}]
     configs = []
-    for values in itertools.product(*[GRID[k] for k in keys]):
+    for o in overrides:
+        for k in o:
+            if k not in GRID_KEYS:
+                raise ValueError('GRID key {} not allowed, use one of {}'.format(k, GRID_KEYS))
         cfg = base_config()
-        cfg.update(dict(zip(keys, values)))
+        cfg.update(o)
         cfg['FEATURE_GROUPS'] = sort_feature_groups(cfg['FEATURE_GROUPS'])
         configs.append(cfg)
     return configs
 #------------------------------------------------------------------------------------------------------------------
 
 def config_text(cfg):
-    return ('feat={} | aug={} | hidden={} | dropout={} | in_drop={} | wd={} | bn={} | lr={} | batch={} | cw={} '
-            '| ls={}').format(
-        '-'.join(cfg['FEATURE_GROUPS']), cfg['N_AUG_VIEWS'], cfg['HIDDEN_LAYERS'], cfg['DROPOUT_RATE'],
-        cfg['INPUT_DROPOUT'], cfg['WEIGHT_DECAY'], cfg['USE_BATCHNORM'], cfg['LEARNING_RATE'], cfg['BATCH_SIZE'],
-        cfg['CLASS_WEIGHTS'], cfg['LABEL_SMOOTHING'])
+    feat = '-'.join(cfg['FEATURE_GROUPS']).replace('hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr', 'V1')
+    return ('r{} | feat={} | aug={} | mixup={} | ls={} | hidden={} | dropout={} | wd={} | lr={} | batch={} '
+            '| cw={}').format(
+        cfg['FEATURE_RATIO'], feat, cfg['N_AUG_VIEWS'], cfg['MIXUP_ALPHA'], cfg['LABEL_SMOOTHING'],
+        cfg['HIDDEN_LAYERS'], cfg['DROPOUT_RATE'], cfg['WEIGHT_DECAY'], cfg['LEARNING_RATE'], cfg['BATCH_SIZE'],
+        cfg['CLASS_WEIGHTS'])
 #------------------------------------------------------------------------------------------------------------------
 
 def check_settings():
@@ -591,8 +705,10 @@ def check_settings():
     sort_feature_groups(FEATURE_GROUPS)
     if FEATURE_RATIO not in (1, 2, 4, 8):
         raise ValueError('FEATURE_RATIO must be 1, 2, 4 or 8')
-    if CHECKPOINT_MONITOR not in MONITORS or EARLY_STOP_MONITOR not in MONITORS:
-        raise ValueError('CHECKPOINT_MONITOR / EARLY_STOP_MONITOR must be one of {}'.format(MONITORS))
+    if CHECKPOINT_MONITOR not in MONITORS or EARLY_STOP_MONITOR not in MONITORS or LR_MONITOR not in MONITORS:
+        raise ValueError('CHECKPOINT_MONITOR / EARLY_STOP_MONITOR / LR_MONITOR must be one of {}'.format(MONITORS))
+    if int(ENSEMBLE_CANDIDATES) < 1:
+        raise ValueError('ENSEMBLE_CANDIDATES must be 1 or more')
     if LR_SCHEDULE not in ('plateau', 'none'):
         raise ValueError("LR_SCHEDULE must be 'plateau' or 'none'")
     if CLASS_WEIGHTS not in ('balanced', 'sqrt', 'none'):
@@ -609,7 +725,8 @@ def check_settings():
         raise ValueError('AUG_SCALE must be (low, high) with 0 < low <= high <= 1')
     if TUNE_BIAS and (BIAS_RANGE <= 0 or BIAS_STEP <= 0 or BIAS_ROUNDS < 1):
         raise ValueError('BIAS_RANGE, BIAS_STEP must be > 0 and BIAS_ROUNDS >= 1')
-    if EARLY_STOP_PATIENCE > 0 and LR_SCHEDULE == 'plateau' and LR_PATIENCE >= EARLY_STOP_PATIENCE:
+    if EARLY_STOP_PATIENCE > 0 and LR_SCHEDULE == 'plateau' and LR_PATIENCE >= EARLY_STOP_PATIENCE \
+            and LR_MONITOR == EARLY_STOP_MONITOR:
         print('WARNING: LR_PATIENCE >= EARLY_STOP_PATIENCE, the training stops before the learning rate is lowered')
     for cfg in grid_configs():
         if not 0.0 <= cfg['DROPOUT_RATE'] < 1.0 or not 0.0 <= cfg['INPUT_DROPOUT'] < 1.0:
@@ -620,6 +737,10 @@ def check_settings():
             raise ValueError('HIDDEN_LAYERS needs at least one layer')
         if int(cfg['N_AUG_VIEWS']) < 0:
             raise ValueError('N_AUG_VIEWS must be 0 or more')
+        if cfg['FEATURE_RATIO'] not in (1, 2, 4, 8):
+            raise ValueError('FEATURE_RATIO must be 1, 2, 4 or 8')
+        if cfg['MIXUP_ALPHA'] < 0:
+            raise ValueError('MIXUP_ALPHA must be 0 or more')
 #------------------------------------------------------------------------------------------------------------------
 
 def find_excel():
@@ -770,7 +891,7 @@ def model_name(cfg):
             r8 = JPEG decode ratio, g-... = feature groups in FEATURE_ORDER, v2 = FEATURE_VERSION,
             t5 = number of test-time views (TTA_VIEWS)
     '''
-    return 'MLP_{}_feat_r{}_g-{}_v{}_t{}'.format(NICKNAME, FEATURE_RATIO, '-'.join(cfg['FEATURE_GROUPS']),
+    return 'MLP_{}_feat_r{}_g-{}_v{}_t{}'.format(NICKNAME, cfg['FEATURE_RATIO'], '-'.join(cfg['FEATURE_GROUPS']),
                                                  FEATURE_VERSION, TTA_VIEWS)
 #------------------------------------------------------------------------------------------------------------------
 
@@ -983,14 +1104,29 @@ def train_one(cfg, X_tr, y_tr, X_val, y_val, seed, label=''):
         ds = ds.shuffle(n, seed=seed, reshuffle_each_iteration=True).batch(cfg['BATCH_SIZE'])
         ds = ds.map(lambda x, y, wt: (tf.gather(x, tf.random.uniform([tf.shape(x)[0]], 0, n_views, tf.int32),
                                                 batch_dims=1), y, wt), num_parallel_calls=AUTOTUNE)
+    alpha = float(cfg['MIXUP_ALPHA'])
+    if alpha > 0:
+        # MIXUP: example i of the batch is blended with a random other example j of the batch:
+        # x = lam x_i + (1 - lam) x_j, same for the target and the class weight, lam ~ Beta(alpha, alpha), lam >= 0.5
+        # (the z-score inside the model is linear, so blending raw features = blending normalized features)
+        def mixup(x, y, wt):
+            b = tf.shape(x)[0]
+            g1, g2 = tf.random.gamma([b], alpha), tf.random.gamma([b], alpha)
+            lam = g1 / (g1 + g2)
+            lam = tf.maximum(lam, 1.0 - lam)
+            perm = tf.random.shuffle(tf.range(b))
+            lx = lam[:, None]
+            return (lx * x + (1.0 - lx) * tf.gather(x, perm), lx * y + (1.0 - lx) * tf.gather(y, perm),
+                    lam * wt + (1.0 - lam) * tf.gather(wt, perm))
+        ds = ds.map(mixup, num_parallel_calls=AUTOTUNE)
     ds = ds.prefetch(AUTOTUNE)
 
     best = BestWeights(CHECKPOINT_MONITOR)
     callbacks = [tf.keras.callbacks.TerminateOnNaN(),
                  ValidationMetrics(X_val, y_val, class_w, X_tr[0], y_tr, label), best]
     if LR_SCHEDULE == 'plateau':
-        callbacks.append(tf.keras.callbacks.ReduceLROnPlateau(monitor=EARLY_STOP_MONITOR,
-                                                              mode=monitor_mode(EARLY_STOP_MONITOR),
+        callbacks.append(tf.keras.callbacks.ReduceLROnPlateau(monitor=LR_MONITOR,
+                                                              mode=monitor_mode(LR_MONITOR),
                                                               factor=LR_FACTOR, patience=LR_PATIENCE,
                                                               min_delta=0.0, min_lr=LR_MIN, verbose=0))
     if EARLY_STOP_PATIENCE > 0:
@@ -1186,7 +1322,8 @@ def log_experiment(row):
 
 def experiment_row(stage, cfg, info, test, seed, extra=None):
     row = {'stage': stage, 'model': 'features', 'feature_groups': '-'.join(cfg['FEATURE_GROUPS']),
-           'n_aug_views': cfg['N_AUG_VIEWS'], 'tta_views': TTA_VIEWS,
+           'ratio': cfg['FEATURE_RATIO'], 'n_aug_views': cfg['N_AUG_VIEWS'], 'mixup': cfg['MIXUP_ALPHA'],
+           'tta_views': TTA_VIEWS,
            'n_features': int(sum(FEATURE_SIZE[g] for g in cfg['FEATURE_GROUPS'])),
            'hidden': str(cfg['HIDDEN_LAYERS']), 'dropout': cfg['DROPOUT_RATE'], 'input_dropout': cfg['INPUT_DROPOUT'],
            'batchnorm': cfg['USE_BATCHNORM'], 'weight_decay': cfg['WEIGHT_DECAY'], 'optimizer': cfg['OPTIMIZER'],
@@ -1216,10 +1353,13 @@ def main():
     configs = grid_configs()
     run_grid = len(GRID) > 0
     if run_grid:
-        print('Grid: {} combinations x {} seed(s) = {} runs, then {} final models ({}-fold) with the best one'.format(
-            len(configs), len(GRID_SEEDS), len(configs) * len(GRID_SEEDS), N_FOLDS, N_FOLDS))
+        print('Grid: {} combinations x {} seed(s) = {} runs, then {} fold models for each of the {} best '
+              'combination(s)'.format(len(configs), len(GRID_SEEDS), len(configs) * len(GRID_SEEDS), N_FOLDS,
+                                      ENSEMBLE_CANDIDATES))
     else:
-        print('GRID = {{}}: no grid, {} final models ({}-fold) with the settings at the top'.format(N_FOLDS, N_FOLDS))
+        print('GRID empty: no grid, {} final models ({}-fold) with the settings at the top'.format(N_FOLDS, N_FOLDS))
+    for c, cfg in enumerate(configs):
+        print('  {}. {}'.format(c + 1, config_text(cfg)))
 
     FILE_NAME = find_excel()
     xdf_data = pd.read_excel(FILE_NAME)
@@ -1237,29 +1377,39 @@ def main():
         raise FileNotFoundError('{} images not found, for example {}. Data folder: {}'.format(
             len(missing), missing[:3], DATA_DIR))
 
-    ## Features of every row (train + test), all groups; each config takes its columns
     ids = xdf_data['id'].tolist()
-    X_all = load_feature_cache(ids, 'orig')
     y_all = xdf_data['target'].map(class_to_idx).to_numpy()
-
     idx_train = np.where(is_train)[0]
     idx_test = np.where(is_test)[0]
     y_train, y_test = y_all[idx_train], y_all[idx_test]
-
-    ## training rows: whole image + the augmented views (as many as the largest N_AUG_VIEWS used)   [V, n_train, D]
-    n_aug = max(int(c['N_AUG_VIEWS']) for c in configs)
     train_ids = [ids[i] for i in idx_train]
-    X_train_views = np.stack([X_all[idx_train]] + [load_feature_cache(train_ids, 'aug{}'.format(j))
-                                                    for j in range(1, n_aug + 1)])
-    ## all rows: whole image + the TTA crops; split into training rows (validation with TTA) and test rows
-    tta_all = [X_all] + [load_feature_cache(ids, 'tta{}'.format(j)) for j in range(1, TTA_VIEWS)]
-    X_train_tta = np.stack([t[idx_train] for t in tta_all])      # [TTA_VIEWS, n_train, D]
-    X_test_views = np.stack([t[idx_test] for t in tta_all])      # [TTA_VIEWS, n_test, D]
-    del X_all, tta_all
-    print('Training images: {} ({} version(s) each for training, {} TTA view(s) for validation)   '
-          'Test images: {} ({} TTA view(s))'.format(len(idx_train), X_train_views.shape[0], X_train_tta.shape[0],
-                                                    len(idx_test), X_test_views.shape[0]))
+
+    #--------------------------------------------------------------------------------------------------------------
+    # FEATURES, per decode ratio: only the columns some combination of that ratio uses are kept in memory
+    ##   train     [1 + N_AUG_VIEWS, n_train, d]  whole image + augmented views (training)
+    ##   train_tta [TTA_VIEWS, n_train, d]        whole image + TTA crops (validation with TTA)
+    ##   test      [TTA_VIEWS, n_test, d]         whole image + TTA crops (test, information only)
+    data = {}
+    for ratio in sorted({c['FEATURE_RATIO'] for c in configs}, reverse=True):          # ratio 8 first (faster)
+        cfgs = [c for c in configs if c['FEATURE_RATIO'] == ratio]
+        used = sort_feature_groups(sorted({g for c in cfgs for g in c['FEATURE_GROUPS']}))
+        keep = feature_columns(used)
+        n_aug = max(int(c['N_AUG_VIEWS']) for c in cfgs)
+        print('\n==== Features, ratio {}: groups {} ({} values), {} augmented view(s), {} TTA view(s) ===='.format(
+            ratio, '-'.join(used), len(keep), n_aug, TTA_VIEWS))
+        X_all = load_feature_cache(ids, 'orig', ratio)[:, keep]
+        train = [X_all[idx_train]] + [load_feature_cache(train_ids, 'aug{}'.format(j), ratio)[:, keep]
+                                      for j in range(1, n_aug + 1)]
+        tta = [X_all] + [load_feature_cache(ids, 'tta{}'.format(j), ratio)[:, keep] for j in range(1, TTA_VIEWS)]
+        data[ratio] = {'cols': keep, 'train': np.stack(train), 'train_tta': np.stack([t[idx_train] for t in tta]),
+                       'test': np.stack([t[idx_test] for t in tta])}
+        del X_all, train, tta
+    print('\nTraining images: {}   Test images: {}'.format(len(idx_train), len(idx_test)))
     rank_key = 'val_score_tta' if TTA_VIEWS > 1 else 'val_score'
+
+    def columns(cfg):
+        ''' positions of the cfg feature groups inside the columns kept for its ratio '''
+        return np.searchsorted(data[cfg['FEATURE_RATIO']]['cols'], feature_columns(cfg['FEATURE_GROUPS']))
 
     def test_scores(model, Xt):
         ''' (score whole image only, score with TTA) of one model on the test rows (information only) '''
@@ -1268,10 +1418,9 @@ def main():
         return lp1, lpt, scores(y_test, np.argmax(lp1, axis=1)), scores(y_test, np.argmax(lpt, axis=1))
 
     #--------------------------------------------------------------------------------------------------------------
-    # GRID (chooses the settings only; its models are not saved). Validation: whole images only.
+    # GRID (chooses the settings only; its models are not saved)
     if run_grid:
         ## Fixed split for the grid: stratified, same seed -> every combination sees the same images
-        ## (positions inside the training rows; same split as before)
         pos_tr, pos_val = train_test_split(np.arange(len(idx_train)), test_size=VAL_FRACTION, stratify=y_train,
                                            random_state=SEED)
         pos_tr, pos_val = np.sort(pos_tr), np.sort(pos_val)
@@ -1279,12 +1428,12 @@ def main():
             len(pos_tr), len(pos_val), len(idx_test)))
         compute_class_weights(y_train[pos_tr], OUTPUTS_a, CLASS_WEIGHTS, verbose=True)
 
-        grid_rows, best = [], None
+        grid_rows, means = [], []
         for c, cfg in enumerate(configs):
-            cols = feature_columns(cfg['FEATURE_GROUPS'])
-            Xc = X_train_views[:1 + int(cfg['N_AUG_VIEWS'])][:, :, cols]
-            Xv = X_train_tta[:, pos_val][:, :, cols]                    # validation images, TTA views
-            Xt = X_test_views[:, :, cols]
+            d, cols = data[cfg['FEATURE_RATIO']], columns(cfg)
+            Xc = d['train'][:1 + int(cfg['N_AUG_VIEWS'])][:, :, cols]
+            Xv = d['train_tta'][:, pos_val][:, :, cols]                   # validation images, TTA views
+            Xt = d['test'][:, :, cols]
             print('\n==== Grid {}/{}: {} ({} features) ===='.format(c + 1, len(configs), config_text(cfg), len(cols)))
             runs = []
             for seed in GRID_SEEDS:
@@ -1306,121 +1455,159 @@ def main():
                                   'val_score_tta': val_tta['score'], 'test_score': test['score'],
                                   'test_score_tta': test_tta['score']})
                 del model, history
-
-            mean_val = float(np.mean(runs))
-            if best is None or mean_val > best['mean_val']:
-                best = {'cfg': cfg, 'mean_val': mean_val, 'combination': c + 1}
+            means.append(float(np.mean(runs)))
+            lead = int(np.argmax(means))
             print('  combination {}: mean {} {:.4f} | leader: combination {} ({:.4f})'.format(
-                c + 1, rank_key, mean_val, best['combination'], best['mean_val']))
+                c + 1, rank_key, means[-1], lead + 1, means[lead]))
             pd.DataFrame(grid_rows).to_csv(out_file('grid_{}.csv'.format(NICKNAME)), index=False)
             del Xc, Xv
 
         ranking = pd.DataFrame(grid_rows).groupby(['combination', 'config'], sort=False)[
-            ['params', 'train_acc', 'val_acc', 'val_score', 'val_score_tta', 'test_score', 'test_score_tta']].mean()
+            ['params', 'epochs_run', 'best_epoch', 'train_acc', 'val_acc', 'val_score', 'val_score_tta', 'test_score',
+             'test_score_tta']].mean()
         ranking = ranking.sort_values(rank_key, ascending=False)
         print('\n================ GRID RANKING (mean over seeds, sorted by {}) ================'.format(rank_key))
         print('train_acc much higher than val_acc -> overfitting; both low and close -> underfitting')
-        with pd.option_context('display.width', 250, 'display.max_colwidth', 160):
+        with pd.option_context('display.width', 300, 'display.max_colwidth', 120):
             print(ranking.round(4).to_string())
-        best_cfg = best['cfg']
-        print('\nBest combination {}: {}'.format(best['combination'], config_text(best_cfg)))
+
+        ## ensemble candidates: best combinations first, at most one per (ratio, feature groups) if asked
+        candidates, seen = [], set()
+        for c in np.argsort(-np.asarray(means), kind='stable'):
+            key = (configs[c]['FEATURE_RATIO'], tuple(configs[c]['FEATURE_GROUPS']))
+            if ENSEMBLE_DISTINCT_FEATURES and key in seen:
+                continue
+            seen.add(key)
+            candidates.append(configs[c])
+            if len(candidates) == ENSEMBLE_CANDIDATES:
+                break
     else:
-        best_cfg = configs[0]
-
-    cols = feature_columns(best_cfg['FEATURE_GROUPS'])
-    Xb = X_train_views[:1 + int(best_cfg['N_AUG_VIEWS'])][:, :, cols]      # [V, n_train, d]
-    Xbv = X_train_tta[:, :, cols]                                          # [TTA_VIEWS, n_train, d]
-    Xbt = X_test_views[:, :, cols]                                         # [TTA_VIEWS, n_test, d]
-    del X_train_views, X_train_tta
+        candidates = [configs[0]]
+    print('\nEnsemble candidates:')
+    for i, cfg in enumerate(candidates):
+        print('  {}. {}'.format(i + 1, config_text(cfg)))
 
     #--------------------------------------------------------------------------------------------------------------
-    # FINAL MODELS: K-fold cross-validation. Model k: trained on the other folds, early-stopped on fold k.
-    print('\n================ FINAL MODELS: {}-fold cross-validation ================'.format(N_FOLDS))
-    print('Settings: {}'.format(config_text(best_cfg)))
-    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=CV_SEED)
-    oof_logp = np.zeros((len(idx_train), OUTPUTS_a), np.float64)     # out-of-fold log-probabilities, whole images
-    oof_logp_tta = np.zeros((len(idx_train), OUTPUTS_a), np.float64)  # out-of-fold, mean over the TTA views
-    test_logp, test_logp_tta, models, fold_infos = [], [], [], []
-    for k, (pos_tr, pos_val) in enumerate(skf.split(np.zeros(len(idx_train)), y_train), start=1):
-        print('\n---- Fold {}/{}: {} training images, {} validation images ----'.format(
-            k, N_FOLDS, len(pos_tr), len(pos_val)))
-        model, history, info = train_one(best_cfg, Xb[:, pos_tr], y_train[pos_tr], Xb[0, pos_val], y_train[pos_val],
-                                         CV_SEED + k, label='[fold {}/{}]'.format(k, N_FOLDS))
-        if k == 1:
-            early_stopping_report(history, 'Fold 1 of {}: {}'.format(N_FOLDS, config_text(best_cfg)))
-        oof_logp[pos_val] = log_softmax_np(predict_np(model, Xb[0, pos_val]))
-        oof_logp_tta[pos_val] = predict_views_logp(model, Xbv[:, pos_val])
-        print('  validation with {} TTA views: score {:.4f}'.format(
-            len(Xbv), scores(y_train[pos_val], np.argmax(oof_logp_tta[pos_val], axis=1))['score']))
-        lp1, lpt, test_k, test_k_tta = test_scores(model, Xbt)
-        test_logp.append(lp1)
-        test_logp_tta.append(lpt)
-        print('  test of this model alone (information only): score {:.4f} | with {} TTA views {:.4f}'.format(
-            test_k['score'], len(Xbt), test_k_tta['score']))
-        log_experiment(experiment_row('cv_fold{}'.format(k), best_cfg, info, test_k, CV_SEED + k,
-                                      extra={'test_score_tta': test_k_tta['score']}))
-        models.append(model)
-        fold_infos.append(info)
-        del history
+    # FINAL MODELS: every candidate on the same K folds. Model k: trained on the other folds, early-stopped on fold k.
+    skf = list(StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=CV_SEED).split(
+        np.zeros(len(idx_train)), y_train))
+    members = []
+    for ci, cfg in enumerate(candidates, start=1):
+        d, cols = data[cfg['FEATURE_RATIO']], columns(cfg)
+        Xb = d['train'][:1 + int(cfg['N_AUG_VIEWS'])][:, :, cols]          # [V, n_train, d]
+        Xbv = d['train_tta'][:, :, cols]                                   # [TTA_VIEWS, n_train, d]
+        Xbt = d['test'][:, :, cols]                                        # [TTA_VIEWS, n_test, d]
+        print('\n================ CANDIDATE {}/{}: {}-fold cross-validation ================'.format(
+            ci, len(candidates), N_FOLDS))
+        print('Settings: {}'.format(config_text(cfg)))
+        oof1 = np.zeros((len(idx_train), OUTPUTS_a), np.float64)          # out-of-fold, whole images
+        ooft = np.zeros((len(idx_train), OUTPUTS_a), np.float64)          # out-of-fold, mean over the TTA views
+        t1, tt, models, infos = [], [], [], []
+        for k, (pos_tr, pos_val) in enumerate(skf, start=1):
+            print('\n---- Candidate {} fold {}/{}: {} training images, {} validation images ----'.format(
+                ci, k, N_FOLDS, len(pos_tr), len(pos_val)))
+            model, history, info = train_one(cfg, Xb[:, pos_tr], y_train[pos_tr], Xb[0, pos_val], y_train[pos_val],
+                                             CV_SEED + k, label='[c{} fold {}/{}]'.format(ci, k, N_FOLDS))
+            if ci == 1 and k == 1:
+                early_stopping_report(history, 'Candidate 1, fold 1 of {}: {}'.format(N_FOLDS, config_text(cfg)))
+            oof1[pos_val] = log_softmax_np(predict_np(model, Xb[0, pos_val]))
+            ooft[pos_val] = predict_views_logp(model, Xbv[:, pos_val])
+            print('  validation with {} TTA views: score {:.4f}'.format(
+                len(Xbv), scores(y_train[pos_val], np.argmax(ooft[pos_val], axis=1))['score']))
+            lp1, lpt, test_k, test_k_tta = test_scores(model, Xbt)
+            t1.append(lp1)
+            tt.append(lpt)
+            print('  test of this model alone (information only): score {:.4f} | with {} TTA views {:.4f}'.format(
+                test_k['score'], len(Xbt), test_k_tta['score']))
+            log_experiment(experiment_row('c{}_fold{}'.format(ci, k), cfg, info, test_k, CV_SEED + k,
+                                          extra={'test_score_tta': test_k_tta['score']}))
+            models.append(model)
+            infos.append(info)
+            del history
+        m = {'cfg': cfg, 'models': models, 'infos': infos, 'oof1': oof1, 'ooft': ooft,
+             'test1': np.mean(t1, axis=0), 'testt': np.mean(tt, axis=0), 'Xbt': Xbt}
+        m['oof_score'] = scores(y_train, np.argmax(ooft, axis=1))['score']
+        m['test_score'] = scores(y_test, np.argmax(m['testt'], axis=1))['score']
+        print('  candidate {}: out-of-fold score with TTA {:.4f} (whole image {:.4f}) | test of its {} models with TTA '
+              '{:.4f} (information only)'.format(ci, m['oof_score'], scores(y_train, np.argmax(oof1, axis=1))['score'],
+                                                 N_FOLDS, m['test_score']))
+        members.append(m)
+        del Xb, Xbv
 
     #--------------------------------------------------------------------------------------------------------------
-    # CLASS BIAS on the out-of-fold predictions (every training image predicted by the model that did not train on it)
-    ## with TTA, as the submitted models predict
-    oof_single = scores(y_train, np.argmax(oof_logp, axis=1))
-    oof_before = scores(y_train, np.argmax(oof_logp_tta, axis=1))
-    print('\n================ OUT-OF-FOLD + CLASS BIAS ================')
-    print('Out-of-fold ({} training images): whole image score {:.4f} | with {} TTA views: f1 {:.4f} kappa {:.4f} '
-          'acc {:.4f} score {:.4f}'.format(len(idx_train), oof_single['score'], TTA_VIEWS, oof_before['f1_macro'],
-                                           oof_before['kappa'], oof_before['acc'], oof_before['score']))
+    # ENSEMBLE SELECTION on the out-of-fold predictions (with TTA): greedy forward selection
+    print('\n================ ENSEMBLE SELECTION (out-of-fold, {} training images) ================'.format(
+        len(idx_train)))
+    order = sorted(range(len(members)), key=lambda i: -members[i]['oof_score'])
+    chosen = [order[0]]
+    current = members[order[0]]['oof_score']
+    print('  start with candidate {}: out-of-fold {:.4f}'.format(order[0] + 1, current))
+    for i in order[1:]:
+        trial = scores(y_train, np.argmax(np.mean([members[j]['ooft'] for j in chosen + [i]], axis=0), axis=1))
+        verdict = 'ADDED' if trial['score'] > current + ENSEMBLE_MIN_GAIN else 'not added'
+        print('  + candidate {}: out-of-fold {:.4f} -> {}'.format(i + 1, trial['score'], verdict))
+        if verdict == 'ADDED':
+            chosen.append(i)
+            current = trial['score']
+    sel = [members[i] for i in chosen]
+    print('Ensemble: candidate(s) {} = {} models'.format([i + 1 for i in chosen], len(sel) * N_FOLDS))
+
+    ## every model has the same weight (same number of folds per candidate) -> mean over the candidates
+    oof_ens = np.mean([m['ooft'] for m in sel], axis=0)
+    oof_before = scores(y_train, np.argmax(oof_ens, axis=1))
     if TUNE_BIAS:
-        bias, s0, s1 = tune_class_bias(oof_logp_tta, y_train, OUTPUTS_a)
+        bias, s0, s1 = tune_class_bias(oof_ens, y_train, OUTPUTS_a)
         print('Bias per class: {}'.format('  '.join('{} {:+.2f}'.format(c, x) for c, x in zip(class_names, bias))))
         print('Out-of-fold score {:.4f} -> {:.4f} (measured on the images it was tuned on: the real gain is smaller)'.format(
             s0, s1))
     else:
         bias = np.zeros(OUTPUTS_a)
-        print('TUNE_BIAS = False: no bias')
-    oof_after = scores(y_train, np.argmax(oof_logp_tta + bias, axis=1))
-
-    ens_logp = np.mean(test_logp, axis=0)
-    ens_logp_tta = np.mean(test_logp_tta, axis=0)
-    t_plain = scores(y_test, np.argmax(ens_logp, axis=1))
-    t_tta = scores(y_test, np.argmax(ens_logp_tta, axis=1))
-    t_final = scores(y_test, np.argmax(ens_logp_tta + bias, axis=1))
-    print('Test (information only, not used to choose): ensemble {:.4f} | ensemble + {} TTA views {:.4f}{}'.format(
-        t_plain['score'], TTA_VIEWS, t_tta['score'],
-        ' | + bias {:.4f}'.format(t_final['score']) if TUNE_BIAS else ''))
+    oof_after = scores(y_train, np.argmax(oof_ens + bias, axis=1))
+    ens_test1 = np.mean([m['test1'] for m in sel], axis=0)
+    ens_testt = np.mean([m['testt'] for m in sel], axis=0)
+    t_plain = scores(y_test, np.argmax(ens_test1, axis=1))
+    t_tta = scores(y_test, np.argmax(ens_testt, axis=1))
+    print('Test (information only, not used to choose): best candidate alone {:.4f} | ensemble {:.4f} | '
+          'ensemble + {} TTA views {:.4f}'.format(members[order[0]]['test_score'], t_plain['score'], TTA_VIEWS,
+                                                 t_tta['score']))
 
     #--------------------------------------------------------------------------------------------------------------
-    # SAVE: bias added to the output layer, weights only (small files), model_<NICKNAME>1..K.keras
+    # SAVE: previous model files moved to previous_models/<date_time>/, then model_<NICKNAME>1..N.keras
     print('\n================ SAVING ================')
-    old = [f for f in os.listdir(OUT_DIR) if re.fullmatch(r'model_{}(\d+)\.keras'.format(re.escape(NICKNAME)), f)
-           and int(re.fullmatch(r'model_{}(\d+)\.keras'.format(re.escape(NICKNAME)), f).group(1)) > N_FOLDS]
-    for f in old:
-        os.remove(out_file(f))
-        print('Deleted {} (left over from a run with more folds)'.format(f))
-    if os.path.exists(out_file('model_{}.keras'.format(NICKNAME))):
-        print('NOTE: model_{0}.keras (single model of an older run) is still in the folder. test_{0}.py uses the '
-              'numbered files when they exist, so do not submit the old file with them.'.format(NICKNAME))
+    pattern = re.compile(r'model_{}\d*\.keras'.format(re.escape(NICKNAME)))
+    old = [f for f in os.listdir(OUT_DIR) if pattern.fullmatch(f)]
+    if old and BACKUP_PREVIOUS_MODELS:
+        backup = out_file(os.path.join('previous_models', datetime.now().strftime('%Y%m%d_%H%M%S')))
+        os.makedirs(backup, exist_ok=True)
+        for f in old + [x for x in ('summary_{}.txt'.format(NICKNAME), 'results_{}.xlsx'.format(NICKNAME))
+                        if os.path.exists(out_file(x))]:
+            shutil.move(out_file(f), os.path.join(backup, f))
+        print('Previous model files ({}) moved to {}'.format(len(old), backup))
+    else:
+        for f in old:
+            os.remove(out_file(f))
 
-    model_files = []
-    for k, model in enumerate(models, start=1):
-        add_output_bias(model, bias)
-        f = out_file('model_{}{}.keras'.format(NICKNAME, k))
-        weights_only_copy(model).save(f)
-        model_files.append(f)
-        print('Saved {} ({:.1f} MB): best epoch {}, fold validation score {:.4f}'.format(
-            os.path.basename(f), os.path.getsize(f) / 1e6, fold_infos[k - 1]['best_epoch'],
-            fold_infos[k - 1]['val']['score']))
+    model_files, model_views, n = [], [], 0
+    for m in sel:
+        for k, model in enumerate(m['models'], start=1):
+            n += 1
+            add_output_bias(model, bias)
+            f = out_file('model_{}{}.keras'.format(NICKNAME, n))
+            weights_only_copy(model).save(f)
+            model_files.append(f)
+            model_views.append(m['Xbt'])
+            print('Saved {} ({:.1f} MB): {} | fold {} best epoch {} validation score {:.4f}'.format(
+                os.path.basename(f), os.path.getsize(f) / 1e6, config_text(m['cfg'])[:60], k,
+                m['infos'][k - 1]['best_epoch'], m['infos'][k - 1]['val']['score']))
 
     #--------------------------------------------------------------------------------------------------------------
     # TEST: the SAVED models, combined as test_Matthew.py does (mean of log-probabilities) -> results_<NICKNAME>.xlsx
     print('\n================ TEST (saved models, as test_{}.py) ================'.format(NICKNAME))
     saved = [tf.keras.models.load_model(f) for f in model_files]
-    save_model([(os.path.basename(f), m) for f, m in zip(model_files, saved)])
-    saved_logp = np.mean([predict_views_logp(m, Xbt) for m in saved], axis=0)     # models x TTA views
+    save_model([(os.path.basename(f), mdl) for f, mdl in zip(model_files, saved)])
+    saved_logp = np.mean([predict_views_logp(mdl, Xt) for mdl, Xt in zip(saved, model_views)], axis=0)
     pred = np.argmax(saved_logp, axis=1)
-    same = float(np.mean(pred == np.argmax(ens_logp_tta + bias, axis=1)))
+    same = float(np.mean(pred == np.argmax(ens_testt + bias, axis=1)))
     print('Check: saved models give the same predictions as the ensemble in memory for {:.2%} of the test images'.format(
         same))
 
@@ -1430,16 +1617,16 @@ def main():
     final_test = scores(y_test, pred)
     print('Leaderboard formula (F1 + kappa)/2 on test: {:.4f}'.format(final_test['score']))
 
-    final_info = {'epochs_run': float(np.mean([i['epochs_run'] for i in fold_infos])),
-                  'best_epoch': float(np.mean([i['best_epoch'] for i in fold_infos])), 'final_lr': np.nan,
-                  'train_accuracy': float(np.mean([i['train_accuracy'] for i in fold_infos])),
+    all_infos = [i for m in sel for i in m['infos']]
+    final_info = {'epochs_run': float(np.mean([i['epochs_run'] for i in all_infos])),
+                  'best_epoch': float(np.mean([i['best_epoch'] for i in all_infos])), 'final_lr': np.nan,
+                  'train_accuracy': float(np.mean([i['train_accuracy'] for i in all_infos])),
                   'val': {'f1_macro': oof_after['f1_macro'], 'kappa': oof_after['kappa'], 'acc': oof_after['acc'],
                           'score': oof_after['score']}}
-    log_experiment(experiment_row('final_ensemble', best_cfg, final_info, final_test, CV_SEED, extra={
-        'n_models': N_FOLDS, 'oof_score_no_bias': oof_before['score'], 'oof_score_no_tta': oof_single['score'],
-        'test_score_no_tta': t_plain['score'],
-        'test_score_tta': t_tta['score'],
-        'bias': ' '.join('{:+.2f}'.format(x) for x in bias)}))
+    log_experiment(experiment_row('final_ensemble', sel[0]['cfg'], final_info, final_test, CV_SEED, extra={
+        'n_models': len(model_files), 'members': ' || '.join(config_text(m['cfg']) for m in sel),
+        'oof_score_no_bias': oof_before['score'], 'test_score_no_tta': t_plain['score'],
+        'test_score_tta': t_tta['score'], 'bias': ' '.join('{:+.2f}'.format(x) for x in bias)}))
     print('Run logged in', out_file('experiments_{}.csv'.format(NICKNAME)),
           ('and ' + out_file('grid_{}.csv'.format(NICKNAME))) if run_grid else '')
     print('Submit: test_{0}.py, {1}, summary_{0}.txt, results_{0}.xlsx'.format(
