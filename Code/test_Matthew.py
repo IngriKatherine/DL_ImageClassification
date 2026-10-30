@@ -26,8 +26,14 @@ def test():
 
         <exam folder>/excel/*.xlsx   excel file with id, target, split
         <exam folder>/Data/          the images
-        model_Matthew.keras          THE model (one file only) in the local directory (folder of this file / folder
-                                     it is run from). No other model file is ever loaded.
+        model_Matthew1.keras, model_Matthew2.keras, ...
+                                     ENSEMBLE (exam section 4.8): every numbered model file in the local directory
+                                     (folder of this file / folder it is run from) is loaded, and the prediction is
+                                     the argmax of the MEAN of their log-probabilities (geometric mean of the softmax
+                                     outputs). The class bias tuned in train_Matthew.py is already inside the output
+                                     layer of each model. If there is no numbered file, the single model_Matthew.keras
+                                     (older submissions) is used.
+        summary_Matthew.txt          model.summary() of every model of the ensemble, one after the other
         results_Matthew.xlsx         output: the rows of the chosen split + column "results"
                                      (predicted class index, 0 = class1 ... 5 = class6), same format as train_example.py
 
@@ -284,12 +290,25 @@ def test():
             len(missing), missing[:3], DATA_DIR))
 
     #--------------------------------------------------------------------------------------------------------------
-    # The model: model_Matthew.keras in the local directory (first folder where it is found). One file only.
-    candidates = [os.path.join(d, 'model_{}.keras'.format(NICKNAME)) for d in local_dirs]
-    found = [f for f in candidates if os.path.exists(f)]
-    if not found:
-        raise FileNotFoundError('model_{}.keras not found in {}'.format(NICKNAME, local_dirs))
-    mf = found[0]
+    # The models: model_Matthew1.keras, model_Matthew2.keras, ... in the local directory (first folder where they are
+    # found), in number order. Without numbered files: the single model_Matthew.keras (older submissions).
+    def models_in(folder):
+        pattern = re.compile(r'^model_{}(\d+)\.keras$'.format(re.escape(NICKNAME)))
+        numbered = sorted((int(m.group(1)), f) for f in os.listdir(folder) for m in [pattern.match(f)] if m)
+        if numbered:
+            return [os.path.join(folder, f) for _, f in numbered]
+        single = os.path.join(folder, 'model_{}.keras'.format(NICKNAME))
+        return [single] if os.path.exists(single) else []
+
+    model_files = []
+    for d in local_dirs:
+        model_files = models_in(d)
+        if model_files:
+            break
+    if not model_files:
+        raise FileNotFoundError('No model_{0}1.keras, model_{0}2.keras, ... or model_{0}.keras found in {1}'.format(
+            NICKNAME, local_dirs))
+    print('Models of the ensemble: {}'.format(', '.join(os.path.basename(f) for f in model_files)))
 
     #--------------------------------------------------------------------------------------------------------------
     def features_of(model):
@@ -395,42 +414,66 @@ def test():
         return final_ds.batch(BATCH_SIZE).prefetch(AUTOTUNE)
 
     #--------------------------------------------------------------------------------------------------------------
-    # Predict: softmax probabilities of the model
-    # loaded exactly as the grader loads it (default compile=True, optimizer state included),
-    # so the summary below is an exact match of the summary generated from the submitted model
-    final_model = tf.keras.models.load_model(mf)
+    def model_proba(final_model, mf):
+        '''
+            softmax output of one model for every image of the split (in the order of the rows)
+        '''
+        n_inputs = int(final_model.input_shape[-1])
+        feat = features_of(final_model)
 
+        if feat is not None:
+            # feature model: colour + texture histograms -> model (features computed once, shared by the models)
+            ratio, groups = feat
+            X = feature_matrix(ratio, groups)
+            if X.shape[1] != n_inputs:
+                raise ValueError('{} expects {} inputs, the features have {}'.format(mf, n_inputs, X.shape[1]))
+            prob = np.asarray(final_model.predict(X, batch_size=1024, verbose=0))
+            print('Model used: {} ({} features, jpeg ratio {}, groups {})'.format(
+                os.path.basename(mf), n_inputs, ratio, '-'.join(groups)))
+        else:
+            # pixel model (older versions of train_Matthew.py)
+            image_size = int(round((n_inputs / CHANNELS) ** 0.5))
+            if image_size * image_size * CHANNELS != n_inputs:
+                raise ValueError('{} expects {} inputs, which is not IMAGE_SIZE*IMAGE_SIZE*{}'.format(
+                    mf, n_inputs, CHANNELS))
+            ratio, antialias = preparation_of(final_model)
+            views = tta_views_of(final_model)
+            prob = predict_proba(final_model, read_data(image_size, ratio, antialias), image_size, views)
+            print('Model used: {} (image size {}, jpeg ratio {}, antialias {}, TTA views {}, first layer: {})'.format(
+                os.path.basename(mf), image_size, ratio, antialias, len(views), final_model.layers[0].name))
+
+        if len(prob) != len(xdf_dset):
+            raise ValueError('{}: {} predictions for {} rows'.format(mf, len(prob), len(xdf_dset)))
+        return prob
+
+    #--------------------------------------------------------------------------------------------------------------
+    # Predict: every model is loaded exactly as the grader loads it (default compile=True), so the summaries below
+    # match the submitted models. Ensemble = mean of the log-probabilities (geometric mean of the softmax outputs).
     os.environ['COLUMNS'] = '80'   # same summary width as an automated run (no terminal)
-    # summary_<nickname>.txt written from the loaded model, as save_model() in test_to_do.py
+    summary_lines = ['Ensemble of {} model(s), prediction = geometric mean of their softmax outputs'.format(
+        len(model_files)), '']
+    sum_logp = None
+    for mf in model_files:
+        final_model = tf.keras.models.load_model(mf)
+        summary_lines.append('==== {} ===='.format(os.path.basename(mf)))
+        final_model.summary(print_fn=lambda x, **kwargs: summary_lines.append(x))
+        summary_lines.append('')
+
+        logp = np.log(np.clip(model_proba(final_model, mf), 1e-12, 1.0)).astype(np.float64)
+        if sum_logp is not None and logp.shape != sum_logp.shape:
+            raise ValueError('{} has {} outputs, the other models {}'.format(mf, logp.shape[1], sum_logp.shape[1]))
+        sum_logp = logp if sum_logp is None else sum_logp + logp
+        del final_model
+        tf.keras.backend.clear_session()
+
+    # summary_<nickname>.txt written from the loaded models, as save_model() in test_to_do.py
     for d in local_dirs:
         with open(os.path.join(d, 'summary_{}.txt'.format(NICKNAME)), 'w', encoding='utf-8', newline='\n') as fh:
-            final_model.summary(print_fn=lambda x, **kwargs: fh.write(x + '\n'))
+            fh.write('\n'.join(summary_lines) + '\n')
 
-    n_inputs = int(final_model.input_shape[-1])
-    feat = features_of(final_model)
-
-    if feat is not None:
-        # feature model: colour + texture histograms -> model
-        ratio, groups = feat
-        X = feature_matrix(ratio, groups)
-        if X.shape[1] != n_inputs:
-            raise ValueError('{} expects {} inputs, the features have {}'.format(mf, n_inputs, X.shape[1]))
-        prob = np.asarray(final_model.predict(X, batch_size=1024, verbose=0))
-        print('Model used: {} ({} features, jpeg ratio {}, groups {})'.format(mf, n_inputs, ratio, '-'.join(groups)))
-    else:
-        # pixel model (older versions of train_Matthew.py)
-        image_size = int(round((n_inputs / CHANNELS) ** 0.5))
-        if image_size * image_size * CHANNELS != n_inputs:
-            raise ValueError('{} expects {} inputs, which is not IMAGE_SIZE*IMAGE_SIZE*{}'.format(
-                mf, n_inputs, CHANNELS))
-        ratio, antialias = preparation_of(final_model)
-        views = tta_views_of(final_model)
-        prob = predict_proba(final_model, read_data(image_size, ratio, antialias), image_size, views)
-        print('Model used: {} (image size {}, jpeg ratio {}, antialias {}, TTA views {}, first layer: {})'.format(
-            mf, image_size, ratio, antialias, len(views), final_model.layers[0].name))
-
-    if len(prob) != len(xdf_dset):
-        raise ValueError('{} predictions for {} rows'.format(len(prob), len(xdf_dset)))
+    mean_logp = sum_logp / len(model_files)
+    prob = np.exp(mean_logp - mean_logp.max(axis=1, keepdims=True))
+    prob = prob / prob.sum(axis=1, keepdims=True)     # geometric mean, normalized (argmax = argmax of mean_logp)
 
     # the answer is the label (index of the most probable class), not the probability
     xdf_dset['results'] = np.argmax(prob, axis=1)

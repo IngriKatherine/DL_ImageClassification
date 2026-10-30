@@ -2,13 +2,14 @@
 import os
 import csv
 import time
+import re
 import argparse
 import itertools
 from datetime import datetime
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import f1_score, cohen_kappa_score, accuracy_score, matthews_corrcoef, confusion_matrix
 from tensorflow.keras.utils import to_categorical
 
@@ -16,6 +17,20 @@ from tensorflow.keras.utils import to_categorical
 
 '''
 Based on train_example.py (LSDR) and train_Matthew.py
+10/30/2026: K-FOLD ENSEMBLE + CLASS BIAS TUNING
+            - GRID (unchanged) only chooses the settings, on the fixed train/validation split. GRID = {} skips it.
+            - FINAL MODELS: the "train" rows are split into N_FOLDS stratified parts (k-fold cross-validation).
+              Model k is trained on the other N_FOLDS-1 parts and early-stopped on part k, so every training image
+              is used by N_FOLDS-1 of the models (before: the 20% validation part was never used for training).
+              Saved as model_Matthew1.keras ... model_MatthewN.keras (exam section 4.8: ensembles in one submission).
+            - ENSEMBLE: test_Matthew.py averages the log-probabilities of the models (geometric mean of the softmax).
+            - CLASS BIAS: every training image has one "out-of-fold" prediction (from the model that did not train on
+              it). A bias b_c per class is searched on these predictions so that argmax(log p + b) maximizes
+              (F1 + kappa)/2, then added to the bias of the output Dense layer of every model:
+              softmax(Wx + c + b). The models stay plain MLPs and need no extra file. With the geometric mean the
+              ensemble argmax moves by exactly b, so the bias found out-of-fold is the one applied at test time.
+            - Saved models hold the weights only (no Adam state): ~6 MB per file instead of ~19 MB.
+            The "test" rows are never used for training or choosing; they are only reported.
 10/27/2026 pm: FEATURE MLP (the previous pixel version is in the git history of this file)
             - INPUT: instead of the 120,000 pixels, every image is described by colour and texture histograms of the
               whole leaf (hue x saturation, brightness, colour moments, excess red/green, local binary patterns at
@@ -114,9 +129,20 @@ GRID = {
 }
 ## each combination is trained once per seed and the validation scores are averaged (differences below ~0.01 between
 ## two combinations are within the noise of one seed: use 2-3 seeds to separate close ones)
-## Final model: the run with the best validation score among the seeds of the best combination is saved as
-## model_<NICKNAME>.keras (one file, the previous one is overwritten)
+## The best combination is then used for the K-fold final models below (GRID = {} -> the settings above, no grid run)
 GRID_SEEDS = [42]
+
+## ---- Final models: K-fold cross-validation ensemble (suggestions 1 + 2) -----------------------------------------
+## model_<NICKNAME>1.keras ... model_<NICKNAME><N_FOLDS>.keras; numbered files left over from a run with more folds
+## are deleted, so the folder only holds the models of this run (test_Matthew.py loads every numbered file)
+N_FOLDS = 5
+CV_SEED = 42                 # split of the folds; model k uses seed CV_SEED + k (initial weights, shuffling)
+
+## ---- Class bias tuning on the out-of-fold predictions (suggestion 5) --------------------------------------------
+TUNE_BIAS = True
+BIAS_RANGE = 1.5             # each class bias is searched in [-BIAS_RANGE, +BIAS_RANGE] (in log-probability units)
+BIAS_STEP = 0.05
+BIAS_ROUNDS = 3              # passes over the classes (coordinate ascent), stops early when nothing improves
 
 #==================================================================================================================
 
@@ -407,6 +433,10 @@ def check_settings():
         raise ValueError("OPTIMIZER must be 'adam', 'rmsprop' or 'sgd'")
     if not 0.0 < VAL_FRACTION < 1.0:
         raise ValueError('VAL_FRACTION must be in (0, 1)')
+    if int(N_FOLDS) < 2:
+        raise ValueError('N_FOLDS must be 2 or more')
+    if TUNE_BIAS and (BIAS_RANGE <= 0 or BIAS_STEP <= 0 or BIAS_ROUNDS < 1):
+        raise ValueError('BIAS_RANGE, BIAS_STEP must be > 0 and BIAS_ROUNDS >= 1')
     if EARLY_STOP_PATIENCE > 0 and LR_SCHEDULE == 'plateau' and LR_PATIENCE >= EARLY_STOP_PATIENCE:
         print('WARNING: LR_PATIENCE >= EARLY_STOP_PATIENCE, the training stops before the learning rate is lowered')
     for cfg in grid_configs():
@@ -530,14 +560,19 @@ def predict_np(model, X, batch=4096):
     return np.concatenate([np.asarray(model(X[i:i + batch], training=False)) for i in range(0, len(X), batch)])
 #------------------------------------------------------------------------------------------------------------------
 
-def save_model(model):
+def save_model(models):
     '''
-         receives the model and print the summary into a .txt file
+         receives the models [(file name, model), ...] and prints their summaries into ONE .txt file
+         (same text as test_Matthew.py writes)
     '''
     os.environ['COLUMNS'] = '80'   # same summary width as an automated run (no terminal)
     with open(out_file('summary_{}.txt'.format(NICKNAME)), 'w', encoding='utf-8', newline='\n') as fh:
-        # Pass the file handle in as a lambda function to make it callable
-        model.summary(print_fn=lambda x, **kwargs: fh.write(x + '\n'))
+        fh.write('Ensemble of {} model(s), prediction = geometric mean of their softmax outputs\n\n'.format(len(models)))
+        for name, model in models:
+            fh.write('==== {} ====\n'.format(name))
+            # Pass the file handle in as a lambda function to make it callable
+            model.summary(print_fn=lambda x, **kwargs: fh.write(x + '\n'))
+            fh.write('\n')
 #------------------------------------------------------------------------------------------------------------------
 
 def make_optimizer(cfg):
@@ -588,12 +623,86 @@ def model_definition(cfg, mean, std):
         if cfg['DROPOUT_RATE'] > 0:
             model.add(tf.keras.layers.Dropout(cfg['DROPOUT_RATE']))
 
-    model.add(tf.keras.layers.Dense(OUTPUTS_a, activation='softmax', kernel_regularizer=reg))
+    model.add(tf.keras.layers.Dense(OUTPUTS_a, activation='softmax', kernel_regularizer=reg, name='output_softmax'))
 
+    compile_model(model, cfg)
+    return model
+#------------------------------------------------------------------------------------------------------------------
+
+def compile_model(model, cfg):
     model.compile(optimizer=make_optimizer(cfg),
                   loss=tf.keras.losses.CategoricalCrossentropy(label_smoothing=cfg['LABEL_SMOOTHING']),
                   metrics=[tf.keras.metrics.CategoricalCrossentropy(name='categorical_ce')])
-    return model
+#------------------------------------------------------------------------------------------------------------------
+
+def weights_only_copy(model):
+    '''
+        same network (same name, layers and weights) rebuilt from its config, without the optimizer state:
+        the .keras file is ~3x smaller (~6 MB instead of ~19 MB, no Adam moments) and loads without warnings.
+        Predictions are identical.
+    '''
+    copy = model.__class__.from_config(model.get_config())
+    copy.set_weights(model.get_weights())
+    return copy
+#------------------------------------------------------------------------------------------------------------------
+
+def log_softmax_np(prob):
+    '''
+        log of softmax outputs (floored, so a probability of exactly 0 does not give -inf)
+    '''
+    return np.log(np.clip(prob, 1e-12, 1.0)).astype(np.float64)
+#------------------------------------------------------------------------------------------------------------------
+
+def fast_score(y_true, y_pred, k):
+    '''
+        (macro F1 + Cohen kappa) / 2 from the confusion matrix (same values as sklearn, ~100x faster: the bias
+        search calls it a few thousand times). Like sklearn, macro F1 averages over the classes that appear in
+        y_true or y_pred.
+    '''
+    cm = np.bincount(y_true * k + y_pred, minlength=k * k).reshape(k, k).astype(np.float64)
+    n, tp = cm.sum(), np.diag(cm)
+    rows, cols = cm.sum(axis=1), cm.sum(axis=0)
+    present = (rows + cols) > 0
+    f1 = np.mean(2.0 * tp[present] / (rows + cols)[present])
+    po, pe = tp.sum() / n, np.sum(rows * cols) / (n * n)
+    kappa = (po - pe) / (1.0 - pe) if pe < 1.0 else 0.0
+    return float((f1 + kappa) / 2.0)
+#------------------------------------------------------------------------------------------------------------------
+
+def tune_class_bias(log_prob, y_true, k):
+    '''
+        coordinate ascent on a bias b_c per class: prediction = argmax(log p + b), objective = (F1 + kappa)/2.
+        b_0 stays 0 (adding the same number to every class changes nothing). Each pass tries every value of the grid
+        for each class in turn and keeps the best; stops when a pass improves nothing.
+        returns b, score before, score after
+    '''
+    b = np.zeros(k)
+    start = best = fast_score(y_true, np.argmax(log_prob, axis=1), k)
+    values = np.round(np.arange(-BIAS_RANGE, BIAS_RANGE + 1e-9, BIAS_STEP), 6)
+    for r in range(BIAS_ROUNDS):
+        improved = False
+        for c in range(1, k):
+            for v in values:
+                trial = b.copy()
+                trial[c] = v
+                s = fast_score(y_true, np.argmax(log_prob + trial, axis=1), k)
+                if s > best + 1e-9:
+                    best, b, improved = s, trial, True
+        print('  bias pass {}: score {:.4f}  b = [{}]'.format(r + 1, best, ' '.join('{:+.2f}'.format(x) for x in b)))
+        if not improved:
+            break
+    return b, start, best
+#------------------------------------------------------------------------------------------------------------------
+
+def add_output_bias(model, b):
+    '''
+        adds b to the bias of the output Dense layer: softmax(Wx + c + b), i.e. log p + b up to a constant per image
+    '''
+    last = model.layers[-1]
+    if not isinstance(last, tf.keras.layers.Dense) or len(last.get_weights()) != 2:
+        raise ValueError('The last layer must be a Dense layer with a bias, found {}'.format(last.name))
+    W, c = last.get_weights()
+    last.set_weights([W, (c + b).astype(c.dtype)])
 #------------------------------------------------------------------------------------------------------------------
 
 class ValidationMetrics(tf.keras.callbacks.Callback):
@@ -906,9 +1015,12 @@ def main():
 
     check_settings()
     configs = grid_configs()
-    print('Grid: {} combinations x {} seed(s) = {} runs, then {}'.format(
-        len(configs), len(GRID_SEEDS), len(configs) * len(GRID_SEEDS),
-        'the best run is saved as model_{}.keras'.format(NICKNAME)))
+    run_grid = len(GRID) > 0
+    if run_grid:
+        print('Grid: {} combinations x {} seed(s) = {} runs, then {} final models ({}-fold) with the best one'.format(
+            len(configs), len(GRID_SEEDS), len(configs) * len(GRID_SEEDS), N_FOLDS, N_FOLDS))
+    else:
+        print('GRID = {{}}: no grid, {} final models ({}-fold) with the settings at the top'.format(N_FOLDS, N_FOLDS))
 
     FILE_NAME = find_excel()
     xdf_data = pd.read_excel(FILE_NAME)
@@ -933,84 +1045,159 @@ def main():
     idx_train = np.where(is_train)[0]
     idx_test = np.where(is_test)[0]
 
-    ## Fixed split for the grid: stratified, same seed -> every combination sees the same images
-    idx_tr, idx_val = train_test_split(idx_train, test_size=VAL_FRACTION, stratify=y_all[idx_train],
-                                       random_state=SEED)
-    idx_tr, idx_val = np.sort(idx_tr), np.sort(idx_val)
-    print('Training images: {}   Validation images: {}   Test images: {}'.format(
-        len(idx_tr), len(idx_val), len(idx_test)))
-    compute_class_weights(y_all[idx_tr], OUTPUTS_a, CLASS_WEIGHTS, verbose=True)
-
     #--------------------------------------------------------------------------------------------------------------
-    # GRID
-    ## only the leading combination is kept in memory (its best seed): model, history, scores
-    grid_rows, best = [], None
-    for c, cfg in enumerate(configs):
-        cols = feature_columns(cfg['FEATURE_GROUPS'])
-        Xc = X_all[:, cols]
-        print('\n==== Grid {}/{}: {} ({} features) ===='.format(c + 1, len(configs), config_text(cfg), len(cols)))
-        runs = []
-        for seed in GRID_SEEDS:
-            model, history, info = train_one(cfg, Xc[idx_tr], y_all[idx_tr], Xc[idx_val], y_all[idx_val], seed,
-                                             label='[{}/{} s{}]'.format(c + 1, len(configs), seed))
-            test = scores(y_all[idx_test], np.argmax(predict_np(model, Xc[idx_test]), axis=1))
-            print('  test (for information only, not used to choose): f1 {:.4f} kappa {:.4f} score {:.4f}'.format(
-                test['f1_macro'], test['kappa'], test['score']))
-            log_experiment(experiment_row('grid', cfg, info, test, seed))
-            runs.append({'model': model, 'history': history, 'info': info, 'test': test, 'seed': seed})
-            grid_rows.append({'combination': c + 1, 'seed': seed, 'config': config_text(cfg),
-                              'params': model.count_params(), 'epochs_run': info['epochs_run'],
-                              'best_epoch': info['best_epoch'], 'train_acc': info['train_accuracy'],
-                              'val_acc': info['val']['acc'], 'val_score': info['val']['score'],
-                              'test_score': test['score']})
+    # GRID (chooses the settings only; its models are not saved)
+    if run_grid:
+        ## Fixed split for the grid: stratified, same seed -> every combination sees the same images
+        idx_tr, idx_val = train_test_split(idx_train, test_size=VAL_FRACTION, stratify=y_all[idx_train],
+                                           random_state=SEED)
+        idx_tr, idx_val = np.sort(idx_tr), np.sort(idx_val)
+        print('Grid split - training images: {}   validation images: {}   test images: {}'.format(
+            len(idx_tr), len(idx_val), len(idx_test)))
+        compute_class_weights(y_all[idx_tr], OUTPUTS_a, CLASS_WEIGHTS, verbose=True)
 
-        mean_val = float(np.mean([r['info']['val']['score'] for r in runs]))
-        if best is None or mean_val > best['mean_val']:
-            top = max(runs, key=lambda r: r['info']['val']['score'])
-            best = dict(top, cfg=cfg, mean_val=mean_val, combination=c + 1)
-        del runs
-        print('  combination {}: mean val score {:.4f} | leader: combination {} ({:.4f})'.format(
-            c + 1, mean_val, best['combination'], best['mean_val']))
-        pd.DataFrame(grid_rows).to_csv(out_file('grid_{}.csv'.format(NICKNAME)), index=False)
+        grid_rows, best = [], None
+        for c, cfg in enumerate(configs):
+            cols = feature_columns(cfg['FEATURE_GROUPS'])
+            Xc = X_all[:, cols]
+            print('\n==== Grid {}/{}: {} ({} features) ===='.format(c + 1, len(configs), config_text(cfg), len(cols)))
+            runs = []
+            for seed in GRID_SEEDS:
+                model, history, info = train_one(cfg, Xc[idx_tr], y_all[idx_tr], Xc[idx_val], y_all[idx_val], seed,
+                                                 label='[{}/{} s{}]'.format(c + 1, len(configs), seed))
+                test = scores(y_all[idx_test], np.argmax(predict_np(model, Xc[idx_test]), axis=1))
+                print('  test (for information only, not used to choose): f1 {:.4f} kappa {:.4f} score {:.4f}'.format(
+                    test['f1_macro'], test['kappa'], test['score']))
+                log_experiment(experiment_row('grid', cfg, info, test, seed))
+                runs.append(info['val']['score'])
+                grid_rows.append({'combination': c + 1, 'seed': seed, 'config': config_text(cfg),
+                                  'params': model.count_params(), 'epochs_run': info['epochs_run'],
+                                  'best_epoch': info['best_epoch'], 'train_acc': info['train_accuracy'],
+                                  'val_acc': info['val']['acc'], 'val_score': info['val']['score'],
+                                  'test_score': test['score']})
+                del model, history
 
-    ranking = pd.DataFrame(grid_rows).groupby(['combination', 'config'], sort=False)[
-        ['params', 'train_acc', 'val_acc', 'val_score', 'test_score']].mean()
-    ranking = ranking.sort_values('val_score', ascending=False)
-    print('\n================ GRID RANKING (mean over seeds, sorted by validation score) ================')
-    print('train_acc much higher than val_acc -> overfitting; both low and close -> underfitting')
-    with pd.option_context('display.width', 250, 'display.max_colwidth', 140):
-        print(ranking.round(4).to_string())
-    best_cfg = best['cfg']
-    print('\nBest combination {}: {}'.format(best['combination'], config_text(best_cfg)))
-    early_stopping_report(best['history'], 'Best grid run: ' + config_text(best_cfg))
+            mean_val = float(np.mean(runs))
+            if best is None or mean_val > best['mean_val']:
+                best = {'cfg': cfg, 'mean_val': mean_val, 'combination': c + 1}
+            print('  combination {}: mean val score {:.4f} | leader: combination {} ({:.4f})'.format(
+                c + 1, mean_val, best['combination'], best['mean_val']))
+            pd.DataFrame(grid_rows).to_csv(out_file('grid_{}.csv'.format(NICKNAME)), index=False)
+
+        ranking = pd.DataFrame(grid_rows).groupby(['combination', 'config'], sort=False)[
+            ['params', 'train_acc', 'val_acc', 'val_score', 'test_score']].mean()
+        ranking = ranking.sort_values('val_score', ascending=False)
+        print('\n================ GRID RANKING (mean over seeds, sorted by validation score) ================')
+        print('train_acc much higher than val_acc -> overfitting; both low and close -> underfitting')
+        with pd.option_context('display.width', 250, 'display.max_colwidth', 140):
+            print(ranking.round(4).to_string())
+        best_cfg = best['cfg']
+        print('\nBest combination {}: {}'.format(best['combination'], config_text(best_cfg)))
+    else:
+        best_cfg = configs[0]
 
     cols = feature_columns(best_cfg['FEATURE_GROUPS'])
     Xb = X_all[:, cols]
+    y_train = y_all[idx_train]
 
     #--------------------------------------------------------------------------------------------------------------
-    # FINAL MODEL: the best grid run (best seed of the best combination), ONE file, overwrites the previous one
-    print('\n================ FINAL MODEL ================')
-    model_file = out_file('model_{}.keras'.format(NICKNAME))
-    best['model'].save(model_file)
-    print('Saved {} ({:.0f} MB): combination {}, seed {}, best epoch {}, val score {:.4f}'.format(
-        os.path.basename(model_file), os.path.getsize(model_file) / 1e6, best['combination'], best['seed'],
-        best['info']['best_epoch'], best['info']['val']['score']))
-
-    # summary from the SAVED model, as test_Matthew.py writes it
-    saved_model = tf.keras.models.load_model(model_file)
-    save_model(saved_model)
+    # FINAL MODELS: K-fold cross-validation. Model k: trained on the other folds, early-stopped on fold k.
+    print('\n================ FINAL MODELS: {}-fold cross-validation ================'.format(N_FOLDS))
+    print('Settings: {}'.format(config_text(best_cfg)))
+    skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=CV_SEED)
+    oof_logp = np.zeros((len(idx_train), OUTPUTS_a), np.float64)     # out-of-fold log-probabilities
+    test_logp, models, fold_infos = [], [], []
+    for k, (pos_tr, pos_val) in enumerate(skf.split(np.zeros(len(idx_train)), y_train), start=1):
+        f_tr, f_val = idx_train[pos_tr], idx_train[pos_val]
+        print('\n---- Fold {}/{}: {} training images, {} validation images ----'.format(
+            k, N_FOLDS, len(f_tr), len(f_val)))
+        model, history, info = train_one(best_cfg, Xb[f_tr], y_all[f_tr], Xb[f_val], y_all[f_val], CV_SEED + k,
+                                         label='[fold {}/{}]'.format(k, N_FOLDS))
+        if k == 1:
+            early_stopping_report(history, 'Fold 1 of {}: {}'.format(N_FOLDS, config_text(best_cfg)))
+        oof_logp[pos_val] = log_softmax_np(predict_np(model, Xb[f_val]))
+        logp_k = log_softmax_np(predict_np(model, Xb[idx_test]))
+        test_logp.append(logp_k)
+        test_k = scores(y_all[idx_test], np.argmax(logp_k, axis=1))
+        print('  test of this model alone (information only): f1 {:.4f} kappa {:.4f} score {:.4f}'.format(
+            test_k['f1_macro'], test_k['kappa'], test_k['score']))
+        log_experiment(experiment_row('cv_fold{}'.format(k), best_cfg, info, test_k, CV_SEED + k))
+        models.append(model)
+        fold_infos.append(info)
+        del history
 
     #--------------------------------------------------------------------------------------------------------------
-    # TEST: predictions of the saved model, as test_Matthew.py computes them -> results_<NICKNAME>.xlsx
-    print('\n================ TEST ================')
-    test_prob = predict_np(saved_model, Xb[idx_test])
+    # CLASS BIAS on the out-of-fold predictions (every training image predicted by the model that did not train on it)
+    oof_before = scores(y_train, np.argmax(oof_logp, axis=1))
+    print('\n================ CLASS BIAS ================')
+    print('Out-of-fold ({} training images): f1 {:.4f} kappa {:.4f} acc {:.4f} score {:.4f}'.format(
+        len(idx_train), oof_before['f1_macro'], oof_before['kappa'], oof_before['acc'], oof_before['score']))
+    if TUNE_BIAS:
+        bias, s0, s1 = tune_class_bias(oof_logp, y_train, OUTPUTS_a)
+        print('Bias per class: {}'.format('  '.join('{} {:+.2f}'.format(c, x) for c, x in zip(class_names, bias))))
+        print('Out-of-fold score {:.4f} -> {:.4f} (measured on the images it was tuned on: the real gain is smaller)'.format(
+            s0, s1))
+    else:
+        bias = np.zeros(OUTPUTS_a)
+        print('TUNE_BIAS = False: no bias')
+    oof_after = scores(y_train, np.argmax(oof_logp + bias, axis=1))
+
+    ens_logp = np.mean(test_logp, axis=0)
+    t_plain = scores(y_all[idx_test], np.argmax(ens_logp, axis=1))
+    t_bias = scores(y_all[idx_test], np.argmax(ens_logp + bias, axis=1))
+    print('Test (information only, not used to choose): ensemble {:.4f} | ensemble + bias {:.4f}'.format(
+        t_plain['score'], t_bias['score']))
+
+    #--------------------------------------------------------------------------------------------------------------
+    # SAVE: bias added to the output layer, fresh optimizer (small files), model_<NICKNAME>1..K.keras
+    print('\n================ SAVING ================')
+    old = [f for f in os.listdir(OUT_DIR) if re.fullmatch(r'model_{}(\d+)\.keras'.format(re.escape(NICKNAME)), f)
+           and int(re.fullmatch(r'model_{}(\d+)\.keras'.format(re.escape(NICKNAME)), f).group(1)) > N_FOLDS]
+    for f in old:
+        os.remove(out_file(f))
+        print('Deleted {} (left over from a run with more folds)'.format(f))
+    if os.path.exists(out_file('model_{}.keras'.format(NICKNAME))):
+        print('NOTE: model_{0}.keras (single model of an older run) is still in the folder. test_{0}.py uses the '
+              'numbered files when they exist, so do not submit the old file with them.'.format(NICKNAME))
+
+    model_files = []
+    for k, model in enumerate(models, start=1):
+        add_output_bias(model, bias)
+        f = out_file('model_{}{}.keras'.format(NICKNAME, k))
+        weights_only_copy(model).save(f)
+        model_files.append(f)
+        print('Saved {} ({:.1f} MB): best epoch {}, fold validation score {:.4f}'.format(
+            os.path.basename(f), os.path.getsize(f) / 1e6, fold_infos[k - 1]['best_epoch'],
+            fold_infos[k - 1]['val']['score']))
+
+    #--------------------------------------------------------------------------------------------------------------
+    # TEST: the SAVED models, combined as test_Matthew.py does (mean of log-probabilities) -> results_<NICKNAME>.xlsx
+    print('\n================ TEST (saved models, as test_{}.py) ================'.format(NICKNAME))
+    saved = [tf.keras.models.load_model(f) for f in model_files]
+    save_model([(os.path.basename(f), m) for f, m in zip(model_files, saved)])
+    saved_logp = np.mean([log_softmax_np(predict_np(m, Xb[idx_test])) for m in saved], axis=0)
+    pred = np.argmax(saved_logp, axis=1)
+    same = float(np.mean(pred == np.argmax(ens_logp + bias, axis=1)))
+    print('Check: saved models give the same predictions as ensemble + bias for {:.2%} of the test images'.format(same))
+
     xdf_dset = xdf_data.iloc[idx_test].copy()
-    predict_func(np.argmax(test_prob, axis=1))
+    predict_func(pred)
     values = metrics_func(['f1_macro', 'coh', 'acc'], ['avg'])
-    final_test = scores(y_all[idx_test], np.argmax(test_prob, axis=1))
+    final_test = scores(y_all[idx_test], pred)
     print('Leaderboard formula (F1 + kappa)/2 on test: {:.4f}'.format(final_test['score']))
-    log_experiment(experiment_row('final', best_cfg, best['info'], final_test, best['seed']))
-    print('Run logged in', out_file('experiments_{}.csv'.format(NICKNAME)), 'and', out_file('grid_{}.csv'.format(NICKNAME)))
+
+    final_info = {'epochs_run': float(np.mean([i['epochs_run'] for i in fold_infos])),
+                  'best_epoch': float(np.mean([i['best_epoch'] for i in fold_infos])), 'final_lr': np.nan,
+                  'train_accuracy': float(np.mean([i['train_accuracy'] for i in fold_infos])),
+                  'val': {'f1_macro': oof_after['f1_macro'], 'kappa': oof_after['kappa'], 'acc': oof_after['acc'],
+                          'score': oof_after['score']}}
+    log_experiment(experiment_row('final_ensemble', best_cfg, final_info, final_test, CV_SEED, extra={
+        'n_models': N_FOLDS, 'oof_score_no_bias': oof_before['score'], 'test_score_no_bias': t_plain['score'],
+        'bias': ' '.join('{:+.2f}'.format(x) for x in bias)}))
+    print('Run logged in', out_file('experiments_{}.csv'.format(NICKNAME)),
+          ('and ' + out_file('grid_{}.csv'.format(NICKNAME))) if run_grid else '')
+    print('Submit: test_{0}.py, {1}, summary_{0}.txt, results_{0}.xlsx'.format(
+        NICKNAME, ', '.join(os.path.basename(f) for f in model_files)))
     return values
 # ------------------------------------------------------------------------------------------------------------------
 
