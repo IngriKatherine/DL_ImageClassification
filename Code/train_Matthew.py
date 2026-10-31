@@ -174,7 +174,7 @@ PRINT_EVERY = 10                   # print one line every PRINT_EVERY epochs (an
 ## N_AUG_VIEWS x 4 min). Each view: random crop of AUG_SCALE of the height and of the width at a random position, then
 ## a small random change of brightness, contrast and saturation (no hue change: colour is the main signal). The same
 ## image always gets the same views (seeded by its name), so the cache stays valid. 0 = no augmentation.
-N_AUG_VIEWS = 4
+N_AUG_VIEWS = 2
 AUG_SEED = 2026
 AUG_SCALE = (0.6, 1.0)
 AUG_BRIGHTNESS = 0.08        # random value in [-0.08, 0.08] added to the pixels (0..1)
@@ -186,7 +186,7 @@ AUG_SATURATION = 0.10        # saturation factor in [0.90, 1.10]
 ## of 80%); 1 = whole image only. Written in the model name (_t5): test_Matthew.py uses the same views.
 ## The views are computed for the training images too (cached), so the GRID ranks the combinations by their
 ## validation score WITH test-time augmentation, i.e. the way the submitted models predict.
-TTA_VIEWS = 5
+TTA_VIEWS = 3                # fast version (5 on 10/30 evening)
 
 ## ---- Grid of experiments -------------------------------------------------------------------------------------
 ## Every combination is trained on the same train/validation split (VAL_FRACTION, SEED) and logged to
@@ -203,19 +203,17 @@ TTA_VIEWS = 5
 ##   train and validation both low and close   -> too simple / too regularized: wider, deeper, less dropout
 ##   train much higher than validation (>0.15) -> overfitting: more dropout / weight decay, or smaller
 GRID = [
+    ## FAST VERSION (cache lost on 10/30 night): ratio 8 only, 2 augmented views, 3 TTA views -> about 1 h 15 in total
     ## reference: the best 10/30 evening combination (validation with TTA 0.881, there with 8 augmented views)
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread'], N_AUG_VIEWS=4),
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread'], N_AUG_VIEWS=2),
     ## + image size / camera information
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'meta'], N_AUG_VIEWS=4),
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'meta'], N_AUG_VIEWS=2),
     ## + spot detector
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'blob'], N_AUG_VIEWS=4),
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'blob'], N_AUG_VIEWS=2),
     ## + both
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'blob', 'meta'], N_AUG_VIEWS=4),
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'blob', 'meta'], N_AUG_VIEWS=2),
     ## everything (another feature set for the ensemble)
-    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread', 'blob', 'meta'], N_AUG_VIEWS=4),
-    ## ratio 4 (features already cached by the 10/30 evening run, + 'meta')
-    dict(FEATURE_RATIO=4, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread', 'meta'], N_AUG_VIEWS=2),
-    dict(FEATURE_RATIO=4, FEATURE_GROUPS=FEATURES_V1 + ['spread', 'meta'], N_AUG_VIEWS=2),
+    dict(FEATURE_RATIO=8, FEATURE_GROUPS=FEATURES_V1 + ['lab', 'tile', 'spread', 'blob', 'meta'], N_AUG_VIEWS=2),
 ]
 ## each combination is trained once per seed and the validation scores are averaged (differences below ~0.01 between
 ## two combinations are within the noise of one seed: use 2-3 seeds to separate close ones)
