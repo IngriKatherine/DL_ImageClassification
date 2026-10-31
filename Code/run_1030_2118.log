@@ -1,0 +1,19 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1793395117.066266    3712 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Grid: 7 combinations x 1 seed(s) = 7 runs, then 5 fold models for each of the 3 best combination(s)
+  1. r8 | feat=V1-spread | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  2. r8 | feat=V1-spread-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  3. r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  4. r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  5. r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  6. r4 | feat=V1-lab-tile-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  7. r4 | feat=V1-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+Traceback (most recent call last):
+  File "/home/ubuntu/DL_ImageClassification/Code/train_Matthew.py", line 1750, in <module>
+    main()
+    ~~~~^^
+  File "/home/ubuntu/DL_ImageClassification/Code/train_Matthew.py", line 1486, in main
+    raise FileNotFoundError('{} images not found, for example {}. Data folder: {}'.format(
+        len(missing), missing[:3], DATA_DIR))
+FileNotFoundError: 14685 images not found, for example ['/home/ubuntu/DL_ImageClassification/Data/img_0.jpg', '/home/ubuntu/DL_ImageClassification/Data/img_1.jpg', '/home/ubuntu/DL_ImageClassification/Data/img_2.jpg']. Data folder: /home/ubuntu/DL_ImageClassification/Data/

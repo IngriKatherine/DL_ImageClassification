@@ -1,0 +1,740 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1793398409.853655   23793 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+I0000 00:00:1793398413.830186   23793 gpu_device.cc:2043] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 20795 MB memory:  -> device: 0, name: NVIDIA A10G, pci bus id: 0000:00:1e.0, compute capability: 8.6
+Grid: 7 combinations x 1 seed(s) = 7 runs, then 5 fold models for each of the 3 best combination(s)
+  1. r8 | feat=V1-spread | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  2. r8 | feat=V1-spread-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  3. r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  4. r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  5. r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  6. r4 | feat=V1-lab-tile-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  7. r4 | feat=V1-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+
+==== Features, ratio 8: groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-lab-tile-spread-blob-meta (1772 values), 4 augmented view(s), 5 TTA view(s) ====
+Computing the features of 14685 images, view orig, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (orig):   1024 / 14685 images  (21 images/s, 11.1 min left)
+  features (orig):   2048 / 14685 images  (21 images/s, 10.2 min left)
+  features (orig):   3072 / 14685 images  (21 images/s, 9.3 min left)
+  features (orig):   4096 / 14685 images  (21 images/s, 8.4 min left)
+  features (orig):   5120 / 14685 images  (21 images/s, 7.6 min left)
+  features (orig):   6144 / 14685 images  (21 images/s, 6.8 min left)
+  features (orig):   7168 / 14685 images  (21 images/s, 6.0 min left)
+  features (orig):   8192 / 14685 images  (21 images/s, 5.2 min left)
+  features (orig):   9216 / 14685 images  (21 images/s, 4.4 min left)
+  features (orig):  10240 / 14685 images  (21 images/s, 3.6 min left)
+  features (orig):  11264 / 14685 images  (21 images/s, 2.7 min left)
+  features (orig):  12288 / 14685 images  (21 images/s, 1.9 min left)
+  features (orig):  13312 / 14685 images  (21 images/s, 1.1 min left)
+  features (orig):  14336 / 14685 images  (21 images/s, 0.3 min left)
+  features (orig):  14685 / 14685 images  (21 images/s, 0.0 min left)
+Reading the image size / file size of 14685 images (meta) ...
+Computing the features of 12093 images, view aug1, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (aug1):   1024 / 12093 images  (29 images/s, 6.4 min left)
+  features (aug1):   2048 / 12093 images  (29 images/s, 5.8 min left)
+  features (aug1):   3072 / 12093 images  (29 images/s, 5.2 min left)
+  features (aug1):   4096 / 12093 images  (29 images/s, 4.6 min left)
+  features (aug1):   5120 / 12093 images  (29 images/s, 4.0 min left)
+  features (aug1):   6144 / 12093 images  (29 images/s, 3.4 min left)
+  features (aug1):   7168 / 12093 images  (29 images/s, 2.8 min left)
+  features (aug1):   8192 / 12093 images  (29 images/s, 2.2 min left)
+  features (aug1):   9216 / 12093 images  (29 images/s, 1.6 min left)
+  features (aug1):  10240 / 12093 images  (29 images/s, 1.1 min left)
+  features (aug1):  11264 / 12093 images  (29 images/s, 0.5 min left)
+  features (aug1):  12093 / 12093 images  (29 images/s, 0.0 min left)
+Computing the features of 12093 images, view aug2, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (aug2):   1024 / 12093 images  (29 images/s, 6.4 min left)
+  features (aug2):   2048 / 12093 images  (29 images/s, 5.8 min left)
+  features (aug2):   3072 / 12093 images  (29 images/s, 5.1 min left)
+  features (aug2):   4096 / 12093 images  (29 images/s, 4.6 min left)
+  features (aug2):   5120 / 12093 images  (29 images/s, 4.0 min left)
+  features (aug2):   6144 / 12093 images  (29 images/s, 3.4 min left)
+  features (aug2):   7168 / 12093 images  (29 images/s, 2.8 min left)
+  features (aug2):   8192 / 12093 images  (29 images/s, 2.2 min left)
+  features (aug2):   9216 / 12093 images  (29 images/s, 1.6 min left)
+  features (aug2):  10240 / 12093 images  (29 images/s, 1.1 min left)
+  features (aug2):  11264 / 12093 images  (29 images/s, 0.5 min left)
+  features (aug2):  12093 / 12093 images  (29 images/s, 0.0 min left)
+Computing the features of 12093 images, view aug3, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (aug3):   1024 / 12093 images  (29 images/s, 6.4 min left)
+  features (aug3):   2048 / 12093 images  (29 images/s, 5.8 min left)
+  features (aug3):   3072 / 12093 images  (29 images/s, 5.1 min left)
+  features (aug3):   4096 / 12093 images  (29 images/s, 4.6 min left)
+  features (aug3):   5120 / 12093 images  (29 images/s, 4.0 min left)
+  features (aug3):   6144 / 12093 images  (29 images/s, 3.4 min left)
+  features (aug3):   7168 / 12093 images  (29 images/s, 2.8 min left)
+  features (aug3):   8192 / 12093 images  (29 images/s, 2.2 min left)
+  features (aug3):   9216 / 12093 images  (29 images/s, 1.6 min left)
+  features (aug3):  10240 / 12093 images  (29 images/s, 1.1 min left)
+  features (aug3):  11264 / 12093 images  (29 images/s, 0.5 min left)
+  features (aug3):  12093 / 12093 images  (29 images/s, 0.0 min left)
+Computing the features of 12093 images, view aug4, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (aug4):   1024 / 12093 images  (29 images/s, 6.4 min left)
+  features (aug4):   2048 / 12093 images  (29 images/s, 5.8 min left)
+  features (aug4):   3072 / 12093 images  (29 images/s, 5.1 min left)
+  features (aug4):   4096 / 12093 images  (29 images/s, 4.6 min left)
+  features (aug4):   5120 / 12093 images  (29 images/s, 4.0 min left)
+  features (aug4):   6144 / 12093 images  (29 images/s, 3.4 min left)
+  features (aug4):   7168 / 12093 images  (29 images/s, 2.8 min left)
+  features (aug4):   8192 / 12093 images  (29 images/s, 2.2 min left)
+  features (aug4):   9216 / 12093 images  (29 images/s, 1.6 min left)
+  features (aug4):  10240 / 12093 images  (29 images/s, 1.1 min left)
+  features (aug4):  11264 / 12093 images  (29 images/s, 0.5 min left)
+  features (aug4):  12093 / 12093 images  (29 images/s, 0.0 min left)
+Computing the features of 14685 images, view tta1, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (tta1):   1024 / 14685 images  (29 images/s, 7.8 min left)
+  features (tta1):   2048 / 14685 images  (29 images/s, 7.2 min left)
+  features (tta1):   3072 / 14685 images  (29 images/s, 6.6 min left)
+  features (tta1):   4096 / 14685 images  (30 images/s, 6.0 min left)
+  features (tta1):   5120 / 14685 images  (30 images/s, 5.4 min left)
+  features (tta1):   6144 / 14685 images  (30 images/s, 4.8 min left)
+  features (tta1):   7168 / 14685 images  (30 images/s, 4.2 min left)
+  features (tta1):   8192 / 14685 images  (30 images/s, 3.6 min left)
+  features (tta1):   9216 / 14685 images  (30 images/s, 3.1 min left)
+  features (tta1):  10240 / 14685 images  (30 images/s, 2.5 min left)
+  features (tta1):  11264 / 14685 images  (30 images/s, 1.9 min left)
+  features (tta1):  12288 / 14685 images  (30 images/s, 1.3 min left)
+  features (tta1):  13312 / 14685 images  (30 images/s, 0.8 min left)
+  features (tta1):  14336 / 14685 images  (30 images/s, 0.2 min left)
+  features (tta1):  14685 / 14685 images  (30 images/s, 0.0 min left)
+Computing the features of 14685 images, view tta2, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (tta2):   1024 / 14685 images  (29 images/s, 7.8 min left)
+  features (tta2):   2048 / 14685 images  (29 images/s, 7.2 min left)
+  features (tta2):   3072 / 14685 images  (30 images/s, 6.5 min left)
+  features (tta2):   4096 / 14685 images  (30 images/s, 5.9 min left)
+  features (tta2):   5120 / 14685 images  (30 images/s, 5.4 min left)
+  features (tta2):   6144 / 14685 images  (30 images/s, 4.8 min left)
+  features (tta2):   7168 / 14685 images  (30 images/s, 4.2 min left)
+  features (tta2):   8192 / 14685 images  (30 images/s, 3.6 min left)
+  features (tta2):   9216 / 14685 images  (30 images/s, 3.1 min left)
+  features (tta2):  10240 / 14685 images  (30 images/s, 2.5 min left)
+  features (tta2):  11264 / 14685 images  (30 images/s, 1.9 min left)
+  features (tta2):  12288 / 14685 images  (30 images/s, 1.3 min left)
+  features (tta2):  13312 / 14685 images  (30 images/s, 0.8 min left)
+  features (tta2):  14336 / 14685 images  (30 images/s, 0.2 min left)
+  features (tta2):  14685 / 14685 images  (30 images/s, 0.0 min left)
+Computing the features of 14685 images, view tta3, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (tta3):   1024 / 14685 images  (29 images/s, 7.9 min left)
+  features (tta3):   2048 / 14685 images  (29 images/s, 7.2 min left)
+  features (tta3):   3072 / 14685 images  (30 images/s, 6.6 min left)
+  features (tta3):   4096 / 14685 images  (30 images/s, 5.9 min left)
+  features (tta3):   5120 / 14685 images  (30 images/s, 5.4 min left)
+  features (tta3):   6144 / 14685 images  (30 images/s, 4.8 min left)
+  features (tta3):   7168 / 14685 images  (30 images/s, 4.2 min left)
+  features (tta3):   8192 / 14685 images  (30 images/s, 3.6 min left)
+  features (tta3):   9216 / 14685 images  (30 images/s, 3.1 min left)
+  features (tta3):  10240 / 14685 images  (30 images/s, 2.5 min left)
+  features (tta3):  11264 / 14685 images  (30 images/s, 1.9 min left)
+  features (tta3):  12288 / 14685 images  (30 images/s, 1.3 min left)
+  features (tta3):  13312 / 14685 images  (30 images/s, 0.8 min left)
+  features (tta3):  14336 / 14685 images  (30 images/s, 0.2 min left)
+  features (tta3):  14685 / 14685 images  (30 images/s, 0.0 min left)
+Computing the features of 14685 images, view tta4, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (tta4):   1024 / 14685 images  (29 images/s, 7.8 min left)
+  features (tta4):   2048 / 14685 images  (29 images/s, 7.1 min left)
+  features (tta4):   3072 / 14685 images  (30 images/s, 6.5 min left)
+  features (tta4):   4096 / 14685 images  (30 images/s, 5.9 min left)
+  features (tta4):   5120 / 14685 images  (30 images/s, 5.3 min left)
+  features (tta4):   6144 / 14685 images  (30 images/s, 4.8 min left)
+  features (tta4):   7168 / 14685 images  (30 images/s, 4.2 min left)
+  features (tta4):   8192 / 14685 images  (30 images/s, 3.6 min left)
+  features (tta4):   9216 / 14685 images  (30 images/s, 3.1 min left)
+  features (tta4):  10240 / 14685 images  (30 images/s, 2.5 min left)
+  features (tta4):  11264 / 14685 images  (30 images/s, 1.9 min left)
+  features (tta4):  12288 / 14685 images  (30 images/s, 1.3 min left)
+  features (tta4):  13312 / 14685 images  (30 images/s, 0.8 min left)
+  features (tta4):  14336 / 14685 images  (30 images/s, 0.2 min left)
+  features (tta4):  14685 / 14685 images  (30 images/s, 0.0 min left)
+
+==== Features, ratio 4: groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-lab-tile-spread-meta (1682 values), 2 augmented view(s), 5 TTA view(s) ====
+Computing the features of 14685 images, view orig, ratio 4, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread ...
+  features (orig):   1024 / 14685 images  (13 images/s, 17.4 min left)
+  features (orig):   2048 / 14685 images  (13 images/s, 16.0 min left)
+  features (orig):   3072 / 14685 images  (13 images/s, 14.6 min left)
+  features (orig):   4096 / 14685 images  (13 images/s, 13.3 min left)
+  features (orig):   5120 / 14685 images  (13 images/s, 12.0 min left)
+  features (orig):   6144 / 14685 images  (13 images/s, 10.7 min left)
+  features (orig):   7168 / 14685 images  (13 images/s, 9.4 min left)
+  features (orig):   8192 / 14685 images  (13 images/s, 8.1 min left)
+  features (orig):   9216 / 14685 images  (13 images/s, 6.9 min left)
+  features (orig):  10240 / 14685 images  (13 images/s, 5.6 min left)
+  features (orig):  11264 / 14685 images  (13 images/s, 4.3 min left)
+  features (orig):  12288 / 14685 images  (13 images/s, 3.0 min left)
+  features (orig):  13312 / 14685 images  (13 images/s, 1.7 min left)
+  features (orig):  14336 / 14685 images  (13 images/s, 0.4 min left)
+  features (orig):  14685 / 14685 images  (13 images/s, 0.0 min left)
+Computing the features of 12093 images, view aug1, ratio 4, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread ...
+  features (aug1):   1024 / 12093 images  (18 images/s, 10.1 min left)
+  features (aug1):   2048 / 12093 images  (18 images/s, 9.1 min left)
+  features (aug1):   3072 / 12093 images  (18 images/s, 8.2 min left)
+  features (aug1):   4096 / 12093 images  (18 images/s, 7.2 min left)
+  features (aug1):   5120 / 12093 images  (19 images/s, 6.3 min left)
+  features (aug1):   6144 / 12093 images  (19 images/s, 5.4 min left)
+  features (aug1):   7168 / 12093 images  (18 images/s, 4.4 min left)
+  features (aug1):   8192 / 12093 images  (19 images/s, 3.5 min left)
+  features (aug1):   9216 / 12093 images  (19 images/s, 2.6 min left)
+  features (aug1):  10240 / 12093 images  (18 images/s, 1.7 min left)
+  features (aug1):  11264 / 12093 images  (18 images/s, 0.7 min left)
+  features (aug1):  12093 / 12093 images  (18 images/s, 0.0 min left)
+Computing the features of 12093 images, view aug2, ratio 4, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread ...
+  features (aug2):   1024 / 12093 images  (18 images/s, 10.1 min left)
+  features (aug2):   2048 / 12093 images  (18 images/s, 9.2 min left)
+  features (aug2):   3072 / 12093 images  (18 images/s, 8.2 min left)
+  features (aug2):   4096 / 12093 images  (18 images/s, 7.3 min left)
+  features (aug2):   5120 / 12093 images  (18 images/s, 6.3 min left)
+  features (aug2):   6144 / 12093 images  (18 images/s, 5.4 min left)
+  features (aug2):   7168 / 12093 images  (18 images/s, 4.5 min left)
+  features (aug2):   8192 / 12093 images  (18 images/s, 3.5 min left)
+  features (aug2):   9216 / 12093 images  (18 images/s, 2.6 min left)
+  features (aug2):  10240 / 12093 images  (18 images/s, 1.7 min left)
+  features (aug2):  11264 / 12093 images  (18 images/s, 0.8 min left)
+  features (aug2):  12093 / 12093 images  (18 images/s, 0.0 min left)
+Computing the features of 14685 images, view tta1, ratio 4, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread ...
+  features (tta1):   1024 / 14685 images  (19 images/s, 11.8 min left)
+  features (tta1):   2048 / 14685 images  (19 images/s, 10.9 min left)
+  features (tta1):   3072 / 14685 images  (19 images/s, 9.9 min left)
+  features (tta1):   4096 / 14685 images  (20 images/s, 9.0 min left)
+  features (tta1):   5120 / 14685 images  (20 images/s, 8.2 min left)
+  features (tta1):   6144 / 14685 images  (20 images/s, 7.3 min left)
+  features (tta1):   7168 / 14685 images  (20 images/s, 6.4 min left)
+  features (tta1):   8192 / 14685 images  (20 images/s, 5.5 min left)
+  features (tta1):   9216 / 14685 images  (20 images/s, 4.7 min left)
+  features (tta1):  10240 / 14685 images  (20 images/s, 3.8 min left)
+  features (tta1):  11264 / 14685 images  (20 images/s, 2.9 min left)
+  features (tta1):  12288 / 14685 images  (20 images/s, 2.0 min left)
+  features (tta1):  13312 / 14685 images  (20 images/s, 1.2 min left)
+  features (tta1):  14336 / 14685 images  (20 images/s, 0.3 min left)
+  features (tta1):  14685 / 14685 images  (20 images/s, 0.0 min left)
+Computing the features of 14685 images, view tta2, ratio 4, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread ...
+  features (tta2):   1024 / 14685 images  (19 images/s, 11.9 min left)
+  features (tta2):   2048 / 14685 images  (19 images/s, 11.0 min left)
+  features (tta2):   3072 / 14685 images  (19 images/s, 10.0 min left)
+  features (tta2):   4096 / 14685 images  (19 images/s, 9.1 min left)
+  features (tta2):   5120 / 14685 images  (19 images/s, 8.2 min left)
+  features (tta2):   6144 / 14685 images  (19 images/s, 7.3 min left)
+  features (tta2):   7168 / 14685 images  (19 images/s, 6.5 min left)
+  features (tta2):   8192 / 14685 images  (19 images/s, 5.6 min left)
+  features (tta2):   9216 / 14685 images  (19 images/s, 4.7 min left)
+  features (tta2):  10240 / 14685 images  (19 images/s, 3.8 min left)W0000 00:00:1793408501.359313   23793 cpu_allocator_impl.cc:82] Allocation of 193866960 exceeds 10% of free system memory.
+W0000 00:00:1793408501.499381   23793 cpu_allocator_impl.cc:82] Allocation of 193866960 exceeds 10% of free system memory.
+W0000 00:00:1793408505.344813   23793 cpu_allocator_impl.cc:82] Allocation of 193866960 exceeds 10% of free system memory.
+I0000 00:00:1793408506.818144   23846 service.cc:153] XLA service 0x7f1310037320 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+I0000 00:00:1793408506.818173   23846 service.cc:161]   StreamExecutor [0]: NVIDIA A10G, Compute Capability 8.6 (Driver: 13.2.0; Runtime: 12.9.0; Toolkit: 12.5.0; DNN: 9.24.0)
+I0000 00:00:1793408506.941659   23846 dump_mlir_util.cc:269] disabling MLIR crash reproducer, set env var `MLIR_CRASH_REPRODUCER_DIRECTORY` to enable.
+I0000 00:00:1793408507.289642   23846 cuda_dnn.cc:461] Loaded cuDNN version 92400
+I0000 00:00:1793408507.421009   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_44927__.47
+I0000 00:00:1793408511.119544   23846 dot_search_space.cc:240] All configs were filtered out because none of them sufficiently match the hints. Maybe the hints set does not contain a good representative set of valid configs? Working around this by using the full hints set instead.
+I0000 00:00:1793408516.908920   23846 device_compiler.h:208] Compiled cluster using XLA!  This line is logged at most once for the lifetime of the process.
+I0000 00:00:1793408517.572131   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_44927__.47
+W0000 00:00:1793408573.127234   23793 cpu_allocator_impl.cc:82] Allocation of 194834360 exceeds 10% of free system memory.
+W0000 00:00:1793408573.268390   23793 cpu_allocator_impl.cc:82] Allocation of 194834360 exceeds 10% of free system memory.
+I0000 00:00:1793408575.435301   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_132437__.47
+I0000 00:00:1793408581.155703   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_132437__.47
+I0000 00:00:1793408646.200014   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_237819__.47
+I0000 00:00:1793408651.903155   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_237819__.47
+
+  features (tta2):  11264 / 14685 images  (19 images/s, 2.9 min left)
+  features (tta2):  12288 / 14685 images  (19 images/s, 2.1 min left)
+  features (tta2):  13312 / 14685 images  (19 images/s, 1.2 min left)
+  features (tta2):  14336 / 14685 images  (19 images/s, 0.3 min left)
+  features (tta2):  14685 / 14685 images  (19 images/s, 0.0 min left)
+Computing the features of 14685 images, view tta3, ratio 4, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread ...
+  features (tta3):   1024 / 14685 images  (19 images/s, 11.9 min left)
+  features (tta3):   2048 / 14685 images  (19 images/s, 10.9 min left)
+  features (tta3):   3072 / 14685 images  (19 images/s, 10.0 min left)
+  features (tta3):   4096 / 14685 images  (19 images/s, 9.1 min left)
+  features (tta3):   5120 / 14685 images  (19 images/s, 8.2 min left)
+  features (tta3):   6144 / 14685 images  (19 images/s, 7.3 min left)
+  features (tta3):   7168 / 14685 images  (19 images/s, 6.4 min left)
+  features (tta3):   8192 / 14685 images  (19 images/s, 5.6 min left)
+  features (tta3):   9216 / 14685 images  (19 images/s, 4.7 min left)
+  features (tta3):  10240 / 14685 images  (19 images/s, 3.8 min left)
+  features (tta3):  11264 / 14685 images  (19 images/s, 2.9 min left)
+  features (tta3):  12288 / 14685 images  (19 images/s, 2.1 min left)
+  features (tta3):  13312 / 14685 images  (19 images/s, 1.2 min left)
+  features (tta3):  14336 / 14685 images  (19 images/s, 0.3 min left)
+  features (tta3):  14685 / 14685 images  (19 images/s, 0.0 min left)
+Computing the features of 14685 images, view tta4, ratio 4, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread ...
+  features (tta4):   1024 / 14685 images  (19 images/s, 11.9 min left)
+  features (tta4):   2048 / 14685 images  (19 images/s, 10.9 min left)
+  features (tta4):   3072 / 14685 images  (19 images/s, 10.0 min left)
+  features (tta4):   4096 / 14685 images  (19 images/s, 9.1 min left)
+  features (tta4):   5120 / 14685 images  (19 images/s, 8.2 min left)
+  features (tta4):   6144 / 14685 images  (19 images/s, 7.3 min left)
+  features (tta4):   7168 / 14685 images  (20 images/s, 6.4 min left)
+  features (tta4):   8192 / 14685 images  (19 images/s, 5.6 min left)
+  features (tta4):   9216 / 14685 images  (19 images/s, 4.7 min left)
+  features (tta4):  10240 / 14685 images  (19 images/s, 3.8 min left)
+  features (tta4):  11264 / 14685 images  (19 images/s, 2.9 min left)
+  features (tta4):  12288 / 14685 images  (19 images/s, 2.1 min left)
+  features (tta4):  13312 / 14685 images  (19 images/s, 1.2 min left)
+  features (tta4):  14336 / 14685 images  (19 images/s, 0.3 min left)
+  features (tta4):  14685 / 14685 images  (19 images/s, 0.0 min left)
+
+Training images: 12093   Test images: 2592
+Grid split - training images: 9674   validation images: 2419   test images: 2592
+Class weights (balanced):
+  class1       897 training images   w = 1.797
+  class2      1781 training images   w = 0.905
+  class3      2589 training images   w = 0.623
+  class4       663 training images   w = 2.432
+  class5      1042 training images   w = 1.547
+  class6      2702 training images   w = 0.597
+
+==== Grid 1/7: r8 | feat=V1-spread | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced (1002 features) ====
+  [1/7 s42] epoch   1 | lr 1.0e-03 | train F 0.8546 acc 0.6465 | val F 0.9034 acc 0.6474 f1 0.6438 kappa 0.5661 score 0.6050
+  [1/7 s42] epoch  10 | lr 1.0e-03 | train F 0.4233 acc 0.8769 | val F 0.5422 acc 0.8289 f1 0.8201 kappa 0.7850 score 0.8026
+  [1/7 s42] epoch  20 | lr 1.0e-03 | train F 0.3317 acc 0.9105 | val F 0.4869 acc 0.8499 f1 0.8461 kappa 0.8109 score 0.8285
+  [1/7 s42] epoch  30 | lr 1.0e-03 | train F 0.2925 acc 0.9253 | val F 0.4846 acc 0.8528 f1 0.8403 kappa 0.8151 score 0.8277
+  [1/7 s42] epoch  40 | lr 5.0e-04 | train F 0.2191 acc 0.9556 | val F 0.4524 acc 0.8731 f1 0.8667 kappa 0.8401 score 0.8534
+  [1/7 s42] epoch  50 | lr 5.0e-04 | train F 0.1830 acc 0.9642 | val F 0.4414 acc 0.8739 f1 0.8721 kappa 0.8410 score 0.8566
+  [1/7 s42] epoch  60 | lr 5.0e-04 | train F 0.1657 acc 0.9701 | val F 0.4377 acc 0.8801 f1 0.8756 kappa 0.8488 score 0.8622
+  [1/7 s42] epoch  70 | lr 2.5e-04 | train F 0.1455 acc 0.9780 | val F 0.4291 acc 0.8780 f1 0.8729 kappa 0.8462 score 0.8595
+  [1/7 s42] epoch  80 | lr 2.5e-04 | train F 0.1430 acc 0.9809 | val F 0.4248 acc 0.8801 f1 0.8756 kappa 0.8487 score 0.8621
+  [1/7 s42] epoch  90 | lr 2.5e-04 | train F 0.1334 acc 0.9847 | val F 0.4252 acc 0.8826 f1 0.8768 kappa 0.8518 score 0.8643
+  [1/7 s42] stopped at epoch 97, best epoch 77 (67 s): train acc 0.9806 | val acc 0.8851 f1 0.8808 kappa 0.8549 score 0.8679
+  validation with 5 TTA views: score 0.8804
+  test (for information only, not used to choose): score 0.8658 | with 5 TTA views 0.8812
+  combination 1: mean val_score_tta 0.8804 | leader: combination 1 (0.8804)
+
+==== Grid 2/7: r8 | feat=V1-spread-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced (1007 features) ====
+  [2/7 s42] epoch   1 | lr 1.0e-03 | train F 0.8560 acc 0.6544 | val F 0.8993 acc 0.6594 f1 0.6515 kappa 0.5795 score 0.6155
+  [2/7 s42] epoch  10 | lr 1.0e-03 | train F 0.4165 acc 0.8784 | val F 0.5333 acc 0.8305 f1 0.8218 kappa 0.7870 score 0.8044
+  [2/7 s42] epoch  20 | lr 1.0e-03 | train F 0.3160 acc 0.9134 | val F 0.4563 acc 0.8636 f1 0.8566 kappa 0.8280 score 0.8423
+  [2/7 s42] epoch  30 | lr 5.0e-04 | train F 0.2535 acc 0.9382 | val F 0.4484 acc 0.8603 f1 0.8533 kappa 0.8243 score 0.8388
+  [2/7 s42] epoch  40 | lr 5.0e-04 | train F 0.2082 acc 0.9604 | val F 0.4373 acc 0.8756 f1 0.8711 kappa 0.8431 score 0.8571
+  [2/7 s42] epoch  50 | lr 5.0e-04 | train F 0.1822 acc 0.9664 | val F 0.4275 acc 0.8780 f1 0.8746 kappa 0.8461 score 0.8604
+  [2/7 s42] epoch  60 | lr 2.5e-04 | train F 0.1625 acc 0.9740 | val F 0.4222 acc 0.8797 f1 0.8740 kappa 0.8484 score 0.8612
+  [2/7 s42] epoch  70 | lr 1.3e-04 | train F 0.1477 acc 0.9783 | val F 0.4121 acc 0.8826 f1 0.8781 kappa 0.8519 score 0.8650
+  [2/7 s42] epoch  80 | lr 1.3e-04 | train F 0.1441 acc 0.9810 | val F 0.4076 acc 0.8838 f1 0.8782 kappa 0.8535 score 0.8659
+  [2/7 s42] epoch  90 | lr 1.3e-04 | train F 0.1379 acc 0.9823 | val F 0.4062 acc 0.8842 f1 0.8805 kappa 0.8540 score 0.8672
+  [2/7 s42] epoch 100 | lr 1.3e-04 | train F 0.1337 acc 0.9837 | val F 0.4106 acc 0.8838 f1 0.8802 kappa 0.8534 score 0.8668
+  [2/7 s42] epoch 110 | lr 6.3e-05 | train F 0.1298 acc 0.9854 | val F 0.4100 acc 0.8826 f1 0.8788 kappa 0.8519 score 0.8653
+  [2/7 s42] stopped at epoch 118, best epoch 98 (69 s): train acc 0.9841 | val acc 0.8871 f1 0.8842 kappa 0.8576 score 0.8709
+  validation with 5 TTA views: score 0.8830
+  test (for information only, not used to choose): score 0.8649 | with 5 TTA views 0.8867
+  combination 2: mean val_score_tta 0.8830 | leader: combination 2 (0.8830)
+
+==== Grid 3/7: r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced (1092 features) ====
+  [3/7 s42] epoch   1 | lr 1.0e-03 | train F 0.7865 acc 0.6840 | val F 0.8295 acc 0.6854 f1 0.6765 kappa 0.6118 score 0.6442
+  [3/7 s42] epoch  10 | lr 1.0e-03 | train F 0.4122 acc 0.8773 | val F 0.5237 acc 0.8247 f1 0.8157 kappa 0.7802 score 0.7979
+  [3/7 s42] epoch  20 | lr 1.0e-03 | train F 0.2950 acc 0.9232 | val F 0.4344 acc 0.8632 f1 0.8601 kappa 0.8276 score 0.8439
+  [3/7 s42] epoch  30 | lr 1.0e-03 | train F 0.2604 acc 0.9353 | val F 0.4328 acc 0.8710 f1 0.8619 kappa 0.8378 score 0.8498
+  [3/7 s42] epoch  40 | lr 5.0e-04 | train F 0.1966 acc 0.9633 | val F 0.4046 acc 0.8842 f1 0.8791 kappa 0.8542 score 0.8666
+  [3/7 s42] epoch  50 | lr 5.0e-04 | train F 0.1727 acc 0.9700 | val F 0.4015 acc 0.8818 f1 0.8779 kappa 0.8508 score 0.8643
+  [3/7 s42] epoch  60 | lr 5.0e-04 | train F 0.1582 acc 0.9763 | val F 0.3985 acc 0.8942 f1 0.8906 kappa 0.8664 score 0.8785
+  [3/7 s42] epoch  70 | lr 2.5e-04 | train F 0.1353 acc 0.9839 | val F 0.3840 acc 0.8946 f1 0.8921 kappa 0.8669 score 0.8795
+  [3/7 s42] epoch  80 | lr 2.5e-04 | train F 0.1325 acc 0.9876 | val F 0.3813 acc 0.8967 f1 0.8944 kappa 0.8696 score 0.8820I0000 00:00:1793408704.265168   23845 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_323658__.47
+I0000 00:00:1793408710.196654   23845 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_323658__.47
+I0000 00:00:1793408778.825732   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_431846__.47
+I0000 00:00:1793408784.422409   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_431846__.47
+I0000 00:00:1793408852.618735   23845 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_525643__.47
+I0000 00:00:1793408858.432637   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_525643__.47
+I0000 00:00:1793408915.860255   23845 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_614013__.47
+I0000 00:00:1793408919.818360   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_614013__.47
+
+  [3/7 s42] epoch  90 | lr 1.3e-04 | train F 0.1275 acc 0.9885 | val F 0.3813 acc 0.8962 f1 0.8944 kappa 0.8691 score 0.8818
+  [3/7 s42] stopped at epoch 95, best epoch 75 (57 s): train acc 0.9850 | val acc 0.9012 f1 0.9004 kappa 0.8753 score 0.8879
+  validation with 5 TTA views: score 0.8917
+  test (for information only, not used to choose): score 0.8847 | with 5 TTA views 0.9014
+  combination 3: mean val_score_tta 0.8917 | leader: combination 3 (0.8917)
+
+==== Grid 4/7: r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced (1097 features) ====
+  [4/7 s42] epoch   1 | lr 1.0e-03 | train F 0.8041 acc 0.6708 | val F 0.8602 acc 0.6709 f1 0.6640 kappa 0.5950 score 0.6295
+  [4/7 s42] epoch  10 | lr 1.0e-03 | train F 0.3900 acc 0.8937 | val F 0.5049 acc 0.8392 f1 0.8333 kappa 0.7976 score 0.8154
+  [4/7 s42] epoch  20 | lr 1.0e-03 | train F 0.2959 acc 0.9169 | val F 0.4355 acc 0.8640 f1 0.8572 kappa 0.8289 score 0.8430
+  [4/7 s42] epoch  30 | lr 1.0e-03 | train F 0.2560 acc 0.9378 | val F 0.4346 acc 0.8656 f1 0.8521 kappa 0.8313 score 0.8417
+  [4/7 s42] epoch  40 | lr 1.0e-03 | train F 0.2100 acc 0.9579 | val F 0.4132 acc 0.8814 f1 0.8762 kappa 0.8505 score 0.8634
+  [4/7 s42] epoch  50 | lr 5.0e-04 | train F 0.1633 acc 0.9731 | val F 0.3871 acc 0.8925 f1 0.8894 kappa 0.8644 score 0.8769
+  [4/7 s42] epoch  60 | lr 5.0e-04 | train F 0.1516 acc 0.9803 | val F 0.3965 acc 0.8946 f1 0.8904 kappa 0.8669 score 0.8787
+  [4/7 s42] epoch  70 | lr 2.5e-04 | train F 0.1318 acc 0.9850 | val F 0.3789 acc 0.8962 f1 0.8930 kappa 0.8691 score 0.8810
+  [4/7 s42] epoch  80 | lr 2.5e-04 | train F 0.1308 acc 0.9877 | val F 0.3834 acc 0.8962 f1 0.8930 kappa 0.8690 score 0.8810
+  [4/7 s42] epoch  90 | lr 1.3e-04 | train F 0.1236 acc 0.9897 | val F 0.3799 acc 0.9012 f1 0.8982 kappa 0.8753 score 0.8867
+  [4/7 s42] epoch 100 | lr 3.1e-05 | train F 0.1204 acc 0.9899 | val F 0.3810 acc 0.9012 f1 0.8965 kappa 0.8753 score 0.8859
+  [4/7 s42] epoch 110 | lr 1.6e-05 | train F 0.1196 acc 0.9905 | val F 0.3800 acc 0.9033 f1 0.8989 kappa 0.8779 score 0.8884
+  [4/7 s42] epoch 120 | lr 7.8e-06 | train F 0.1190 acc 0.9912 | val F 0.3799 acc 0.9020 f1 0.8979 kappa 0.8763 score 0.8871
+  [4/7 s42] stopped at epoch 121, best epoch 101 (72 s): train acc 0.9904 | val acc 0.9049 f1 0.9016 kappa 0.8799 score 0.8908
+  validation with 5 TTA views: score 0.8971
+  test (for information only, not used to choose): score 0.8878 | with 5 TTA views 0.9008
+  combination 4: mean val_score_tta 0.8971 | leader: combination 4 (0.8971)
+
+==== Grid 5/7: r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced (1772 features) ====
+  [5/7 s42] epoch   1 | lr 1.0e-03 | train F 0.7737 acc 0.6871 | val F 0.7960 acc 0.6846 f1 0.6845 kappa 0.6072 score 0.6458
+  [5/7 s42] epoch  10 | lr 1.0e-03 | train F 0.3895 acc 0.8893 | val F 0.5118 acc 0.8396 f1 0.8333 kappa 0.7982 score 0.8158
+  [5/7 s42] epoch  20 | lr 1.0e-03 | train F 0.2814 acc 0.9287 | val F 0.4411 acc 0.8681 f1 0.8632 kappa 0.8338 score 0.8485
+  [5/7 s42] epoch  30 | lr 1.0e-03 | train F 0.2316 acc 0.9478 | val F 0.4329 acc 0.8756 f1 0.8669 kappa 0.8435 score 0.8552
+  [5/7 s42] epoch  40 | lr 1.0e-03 | train F 0.1921 acc 0.9649 | val F 0.4286 acc 0.8797 f1 0.8732 kappa 0.8483 score 0.8607
+  [5/7 s42] epoch  50 | lr 1.0e-03 | train F 0.1744 acc 0.9723 | val F 0.4085 acc 0.8834 f1 0.8796 kappa 0.8531 score 0.8664
+  [5/7 s42] epoch  60 | lr 5.0e-04 | train F 0.1457 acc 0.9844 | val F 0.4059 acc 0.8917 f1 0.8874 kappa 0.8632 score 0.8753
+  [5/7 s42] epoch  70 | lr 5.0e-04 | train F 0.1269 acc 0.9876 | val F 0.4017 acc 0.8933 f1 0.8905 kappa 0.8653 score 0.8779
+  [5/7 s42] epoch  80 | lr 2.5e-04 | train F 0.1204 acc 0.9912 | val F 0.3918 acc 0.8995 f1 0.8951 kappa 0.8731 score 0.8841
+  [5/7 s42] epoch  90 | lr 1.3e-04 | train F 0.1170 acc 0.9935 | val F 0.3951 acc 0.8971 f1 0.8946 kappa 0.8700 score 0.8823
+  [5/7 s42] epoch 100 | lr 1.3e-04 | train F 0.1137 acc 0.9944 | val F 0.3952 acc 0.8971 f1 0.8951 kappa 0.8699 score 0.8825
+  [5/7 s42] stopped at epoch 104, best epoch 84 (73 s): train acc 0.9925 | val acc 0.9016 f1 0.8984 kappa 0.8756 score 0.8870
+  validation with 5 TTA views: score 0.8966
+  test (for information only, not used to choose): score 0.8854 | with 5 TTA views 0.8984
+  combination 5: mean val_score_tta 0.8966 | leader: combination 4 (0.8971)
+
+==== Grid 6/7: r4 | feat=V1-lab-tile-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced (1682 features) ====
+  [6/7 s42] epoch   1 | lr 1.0e-03 | train F 0.8550 acc 0.6476 | val F 0.9072 acc 0.6379 f1 0.6401 kappa 0.5525 score 0.5963
+  [6/7 s42] epoch  10 | lr 1.0e-03 | train F 0.4145 acc 0.8830 | val F 0.5499 acc 0.8210 f1 0.8176 kappa 0.7745 score 0.7961
+  [6/7 s42] epoch  20 | lr 1.0e-03 | train F 0.2919 acc 0.9241 | val F 0.4742 acc 0.8491 f1 0.8426 kappa 0.8100 score 0.8263
+  [6/7 s42] epoch  30 | lr 1.0e-03 | train F 0.2335 acc 0.9471 | val F 0.4593 acc 0.8553 f1 0.8474 kappa 0.8180 score 0.8327
+  [6/7 s42] epoch  40 | lr 1.0e-03 | train F 0.1915 acc 0.9656 | val F 0.4501 acc 0.8698 f1 0.8658 kappa 0.8358 score 0.8508
+  [6/7 s42] epoch  50 | lr 5.0e-04 | train F 0.1507 acc 0.9780 | val F 0.4346 acc 0.8752 f1 0.8737 kappa 0.8423 score 0.8580
+  [6/7 s42] epoch  60 | lr 2.5e-04 | train F 0.1327 acc 0.9851 | val F 0.4331 acc 0.8764 f1 0.8720 kappa 0.8440 score 0.8580
+  [6/7 s42] epoch  70 | lr 2.5e-04 | train F 0.1196 acc 0.9905 | val F 0.4297 acc 0.8785 f1 0.8740 kappa 0.8466 score 0.8603
+  [6/7 s42] epoch  80 | lr 1.3e-04 | train F 0.1178 acc 0.9914 | val F 0.4270 acc 0.8768 f1 0.8726 kappa 0.8444 score 0.8585
+  [6/7 s42] epoch  90 | lr 6.3e-05 | train F 0.1144 acc 0.9926 | val F 0.4263 acc 0.8764 f1 0.8714 kappa 0.8440 score 0.8577
+  [6/7 s42] stopped at epoch 98, best epoch 78 (62 s): train acc 0.9909 | val acc 0.8814 f1 0.8792 kappa 0.8502 score 0.8647
+  validation with 5 TTA views: score 0.8767
+  test (for information only, not used to choose): score 0.8626 | with 5 TTA views 0.8667
+  combination 6: mean val_score_tta 0.8767 | leader: combination 4 (0.8971)
+
+==== Grid 7/7: r4 | feat=V1-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced (1007 features) ====
+  [7/7 s42] epoch   1 | lr 1.0e-03 | train F 0.8634 acc 0.6424 | val F 0.9178 acc 0.6437 f1 0.6412 kappa 0.5596 score 0.6004
+  [7/7 s42] epoch  10 | lr 1.0e-03 | train F 0.4207 acc 0.8752 | val F 0.5416 acc 0.8264 f1 0.8201 kappa 0.7813 score 0.8007
+  [7/7 s42] epoch  20 | lr 1.0e-03 | train F 0.3042 acc 0.9227 | val F 0.4651 acc 0.8586 f1 0.8499 kappa 0.8220 score 0.8360
+  [7/7 s42] epoch  30 | lr 5.0e-04 | train F 0.2311 acc 0.9509 | val F 0.4380 acc 0.8673 f1 0.8607 kappa 0.8329 score 0.8468
+  [7/7 s42] epoch  40 | lr 5.0e-04 | train F 0.1932 acc 0.9652 | val F 0.4389 acc 0.8731 f1 0.8674 kappa 0.8401 score 0.8537
+  [7/7 s42] epoch  50 | lr 2.5e-04 | train F 0.1585 acc 0.9746 | val F 0.4259 acc 0.8785 f1 0.8749 kappa 0.8466 score 0.8608
+  [7/7 s42] epoch  60 | lr 2.5e-04 | train F 0.1479 acc 0.9790 | val F 0.4188 acc 0.8768 f1 0.8720 kappa 0.8447 score 0.8583
+  [7/7 s42] epoch  70 | lr 1.3e-04 | train F 0.1355 acc 0.9823 | val F 0.4161 acc 0.8785 f1 0.8746 kappa 0.8467 score 0.8606
+  [7/7 s42] epoch  80 | lr 1.3e-04 | train F 0.1319 acc 0.9849 | val F 0.4131 acc 0.8789 f1 0.8749 kappa 0.8472 score 0.8610
+  [7/7 s42] epoch  90 | lr 3.1e-05 | train F 0.1284 acc 0.9852 | val F 0.4131 acc 0.8838 f1 0.8814 kappa 0.8534 score 0.8674
+  [7/7 s42] epoch 100 | lr 1.6e-05 | train F 0.1255 acc 0.9863 | val F 0.4117 acc 0.8863 f1 0.8836 kappa 0.8565 score 0.8700
+  [7/7 s42] epoch 110 | lr 7.8e-06 | train F 0.1251 acc 0.9865 | val F 0.4115 acc 0.8847 f1 0.8818 kappa 0.8544 score 0.8681
+  [7/7 s42] stopped at epoch 119, best epoch 99 (62 s): train acc 0.9860 | val acc 0.8880 f1 0.8849 kappa 0.8585 score 0.8717
+  validation with 5 TTA views: score 0.8837
+  test (for information only, not used to choose): score 0.8694 | with 5 TTA views 0.8788I0000 00:00:1793408978.982467   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_720496__.47
+I0000 00:00:1793408982.959584   23845 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_720496__.47
+I0000 00:00:1793409037.209114   23845 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_806187__.47
+I0000 00:00:1793409041.174815   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_806187__.47
+I0000 00:00:1793409098.168742   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_897927__.47
+I0000 00:00:1793409102.139868   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_897927__.47
+
+  combination 7: mean val_score_tta 0.8837 | leader: combination 4 (0.8971)
+
+================ GRID RANKING (mean over seeds, sorted by val_score_tta) ================
+train_acc much higher than val_acc -> overfitting; both low and close -> underfitting
+                                                                                                                                                                         params  epochs_run  best_epoch  train_acc  val_acc  val_score  val_score_tta  test_score  test_score_tta
+combination config                                                                                                                                                                                                                                                               
+4           r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced           1787398.0       121.0       101.0     0.9904   0.9049     0.8908         0.8971      0.8878          0.9008
+5           r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced  2478598.0       104.0        84.0     0.9925   0.9016     0.8870         0.8966      0.8854          0.8984
+3           r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced                1782278.0        95.0        75.0     0.9850   0.9012     0.8879         0.8917      0.8847          0.9014
+7           r4 | feat=V1-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced                1695238.0       119.0        99.0     0.9860   0.8880     0.8717         0.8837      0.8694          0.8788
+2           r8 | feat=V1-spread-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced                1695238.0       118.0        98.0     0.9841   0.8871     0.8709         0.8830      0.8649          0.8867
+1           r8 | feat=V1-spread | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced                     1690118.0        97.0        77.0     0.9806   0.8851     0.8679         0.8804      0.8658          0.8812
+6           r4 | feat=V1-lab-tile-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced       2386438.0        98.0        78.0     0.9909   0.8814     0.8647         0.8767      0.8626          0.8667
+
+Ensemble candidates:
+  1. r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  2. r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  3. r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+
+================ CANDIDATE 1/3: 5-fold cross-validation ================
+Settings: r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+
+---- Candidate 1 fold 1/5: 9674 training images, 2419 validation images ----
+  [c1 fold 1/5] epoch   1 | lr 1.0e-03 | train F 0.8044 acc 0.6643 | val F 0.8284 acc 0.6552 f1 0.6478 kappa 0.5773 score 0.6125
+  [c1 fold 1/5] epoch  10 | lr 1.0e-03 | train F 0.3963 acc 0.8812 | val F 0.5000 acc 0.8367 f1 0.8270 kappa 0.7951 score 0.8111
+  [c1 fold 1/5] epoch  20 | lr 1.0e-03 | train F 0.3032 acc 0.9204 | val F 0.4482 acc 0.8594 f1 0.8483 kappa 0.8233 score 0.8358
+  [c1 fold 1/5] epoch  30 | lr 1.0e-03 | train F 0.2430 acc 0.9441 | val F 0.4271 acc 0.8685 f1 0.8588 kappa 0.8346 score 0.8467
+  [c1 fold 1/5] epoch  40 | lr 1.0e-03 | train F 0.2177 acc 0.9514 | val F 0.4204 acc 0.8764 f1 0.8661 kappa 0.8443 score 0.8552
+  [c1 fold 1/5] epoch  50 | lr 1.0e-03 | train F 0.1807 acc 0.9662 | val F 0.4001 acc 0.8801 f1 0.8740 kappa 0.8489 score 0.8615
+  [c1 fold 1/5] epoch  60 | lr 5.0e-04 | train F 0.1555 acc 0.9779 | val F 0.3929 acc 0.8913 f1 0.8837 kappa 0.8628 score 0.8732
+  [c1 fold 1/5] epoch  70 | lr 2.5e-04 | train F 0.1412 acc 0.9819 | val F 0.3922 acc 0.8971 f1 0.8850 kappa 0.8701 score 0.8775
+  [c1 fold 1/5] epoch  80 | lr 2.5e-04 | train F 0.1307 acc 0.9848 | val F 0.3959 acc 0.8929 f1 0.8826 kappa 0.8648 score 0.8737
+  [c1 fold 1/5] epoch  90 | lr 6.3e-05 | train F 0.1257 acc 0.9874 | val F 0.3864 acc 0.9004 f1 0.8912 kappa 0.8741 score 0.8827
+  [c1 fold 1/5] stopped at epoch 95, best epoch 75 (56 s): train acc 0.9842 | val acc 0.9008 f1 0.8913 kappa 0.8747 score 0.8830
+Early stopping plot saved to /home/ubuntu/DL_ImageClassification/Code/early_stopping_Matthew.png
+  validation with 5 TTA views: score 0.8991
+  test of this model alone (information only): score 0.8915 | with 5 TTA views 0.8992
+
+---- Candidate 1 fold 2/5: 9674 training images, 2419 validation images ----
+  [c1 fold 2/5] epoch   1 | lr 1.0e-03 | train F 0.7631 acc 0.6942 | val F 0.7919 acc 0.6784 f1 0.6724 kappa 0.6038 score 0.6381
+  [c1 fold 2/5] epoch  10 | lr 1.0e-03 | train F 0.4079 acc 0.8660 | val F 0.5142 acc 0.8074 f1 0.8030 kappa 0.7592 score 0.7811
+  [c1 fold 2/5] epoch  20 | lr 1.0e-03 | train F 0.2984 acc 0.9205 | val F 0.4421 acc 0.8541 f1 0.8488 kappa 0.8170 score 0.8329
+  [c1 fold 2/5] epoch  30 | lr 1.0e-03 | train F 0.2411 acc 0.9420 | val F 0.4169 acc 0.8636 f1 0.8633 kappa 0.8281 score 0.8457
+  [c1 fold 2/5] epoch  40 | lr 5.0e-04 | train F 0.1917 acc 0.9663 | val F 0.4071 acc 0.8855 f1 0.8795 kappa 0.8554 score 0.8674
+  [c1 fold 2/5] epoch  50 | lr 5.0e-04 | train F 0.1634 acc 0.9749 | val F 0.3920 acc 0.8768 f1 0.8713 kappa 0.8447 score 0.8580
+  [c1 fold 2/5] epoch  60 | lr 5.0e-04 | train F 0.1523 acc 0.9776 | val F 0.3915 acc 0.8838 f1 0.8776 kappa 0.8535 score 0.8655
+  [c1 fold 2/5] epoch  70 | lr 2.5e-04 | train F 0.1345 acc 0.9836 | val F 0.3837 acc 0.8909 f1 0.8853 kappa 0.8622 score 0.8737
+  [c1 fold 2/5] epoch  80 | lr 2.5e-04 | train F 0.1295 acc 0.9877 | val F 0.3732 acc 0.8913 f1 0.8864 kappa 0.8628 score 0.8746
+  [c1 fold 2/5] epoch  90 | lr 1.3e-04 | train F 0.1246 acc 0.9895 | val F 0.3770 acc 0.8859 f1 0.8824 kappa 0.8558 score 0.8691
+  [c1 fold 2/5] epoch 100 | lr 3.1e-05 | train F 0.1217 acc 0.9892 | val F 0.3740 acc 0.8925 f1 0.8866 kappa 0.8643 score 0.8755
+  [c1 fold 2/5] stopped at epoch 102, best epoch 82 (60 s): train acc 0.9878 | val acc 0.8942 f1 0.8902 kappa 0.8664 score 0.8783
+  validation with 5 TTA views: score 0.8861
+  test of this model alone (information only): score 0.8771 | with 5 TTA views 0.8931
+
+---- Candidate 1 fold 3/5: 9674 training images, 2419 validation images ----
+  [c1 fold 3/5] epoch   1 | lr 1.0e-03 | train F 0.8047 acc 0.6584 | val F 0.8633 acc 0.6470 f1 0.6401 kappa 0.5675 score 0.6038
+  [c1 fold 3/5] epoch  10 | lr 1.0e-03 | train F 0.3889 acc 0.8902 | val F 0.5031 acc 0.8384 f1 0.8255 kappa 0.7967 score 0.8111
+  [c1 fold 3/5] epoch  20 | lr 1.0e-03 | train F 0.3010 acc 0.9232 | val F 0.4553 acc 0.8690 f1 0.8581 kappa 0.8346 score 0.8464
+  [c1 fold 3/5] epoch  30 | lr 5.0e-04 | train F 0.2255 acc 0.9537 | val F 0.4298 acc 0.8785 f1 0.8679 kappa 0.8467 score 0.8573
+  [c1 fold 3/5] epoch  40 | lr 5.0e-04 | train F 0.1912 acc 0.9609 | val F 0.4090 acc 0.8838 f1 0.8725 kappa 0.8534 score 0.8630
+  [c1 fold 3/5] epoch  50 | lr 2.5e-04 | train F 0.1598 acc 0.9752 | val F 0.4029 acc 0.8876 f1 0.8750 kappa 0.8579 score 0.8664
+  [c1 fold 3/5] epoch  60 | lr 2.5e-04 | train F 0.1479 acc 0.9773 | val F 0.3993 acc 0.8909 f1 0.8782 kappa 0.8621 score 0.8702
+  [c1 fold 3/5] epoch  70 | lr 1.3e-04 | train F 0.1372 acc 0.9822 | val F 0.4062 acc 0.8954 f1 0.8827 kappa 0.8677 score 0.8752
+  [c1 fold 3/5] epoch  80 | lr 6.3e-05 | train F 0.1330 acc 0.9843 | val F 0.4001 acc 0.8950 f1 0.8819 kappa 0.8673 score 0.8746
+  [c1 fold 3/5] stopped at epoch 88, best epoch 68 (51 s): train acc 0.9810 | val acc 0.8975 f1 0.8856 kappa 0.8704 score 0.8780I0000 00:00:1793409150.555277   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_977643__.47
+I0000 00:00:1793409154.537231   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_977643__.47
+I0000 00:00:1793409203.896196   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1050478__.47
+I0000 00:00:1793409207.885723   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1050478__.47
+I0000 00:00:1793409281.427401   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1170644__.47
+I0000 00:00:1793409285.246181   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1170644__.47
+I0000 00:00:1793409347.527549   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1258086__.47
+I0000 00:00:1793409351.382211   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1258086__.47
+I0000 00:00:1793409409.821012   23845 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1338619__.47
+I0000 00:00:1793409413.639499   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1338619__.47
+
+  validation with 5 TTA views: score 0.8904
+  test of this model alone (information only): score 0.8808 | with 5 TTA views 0.8927
+
+---- Candidate 1 fold 4/5: 9675 training images, 2418 validation images ----
+  [c1 fold 4/5] epoch   1 | lr 1.0e-03 | train F 0.7432 acc 0.7037 | val F 0.7702 acc 0.6911 f1 0.6827 kappa 0.6179 score 0.6503
+  [c1 fold 4/5] epoch  10 | lr 1.0e-03 | train F 0.3988 acc 0.8761 | val F 0.4954 acc 0.8350 f1 0.8254 kappa 0.7932 score 0.8093
+  [c1 fold 4/5] epoch  20 | lr 1.0e-03 | train F 0.2981 acc 0.9212 | val F 0.4487 acc 0.8701 f1 0.8624 kappa 0.8362 score 0.8493
+  [c1 fold 4/5] epoch  30 | lr 1.0e-03 | train F 0.2473 acc 0.9328 | val F 0.4272 acc 0.8730 f1 0.8631 kappa 0.8403 score 0.8517
+  [c1 fold 4/5] epoch  40 | lr 1.0e-03 | train F 0.2150 acc 0.9561 | val F 0.4300 acc 0.8863 f1 0.8801 kappa 0.8563 score 0.8682
+  [c1 fold 4/5] epoch  50 | lr 1.0e-03 | train F 0.1837 acc 0.9689 | val F 0.4082 acc 0.8896 f1 0.8831 kappa 0.8605 score 0.8718
+  [c1 fold 4/5] epoch  60 | lr 1.0e-03 | train F 0.1615 acc 0.9748 | val F 0.3941 acc 0.8987 f1 0.8939 kappa 0.8720 score 0.8829
+  [c1 fold 4/5] epoch  70 | lr 1.0e-03 | train F 0.1456 acc 0.9756 | val F 0.3897 acc 0.8916 f1 0.8846 kappa 0.8632 score 0.8739
+  [c1 fold 4/5] epoch  80 | lr 1.0e-03 | train F 0.1339 acc 0.9845 | val F 0.4041 acc 0.8916 f1 0.8859 kappa 0.8630 score 0.8744
+  [c1 fold 4/5] stopped at epoch 80, best epoch 60 (52 s): train acc 0.9748 | val acc 0.8987 f1 0.8939 kappa 0.8720 score 0.8829
+  validation with 5 TTA views: score 0.8935
+  test of this model alone (information only): score 0.8757 | with 5 TTA views 0.8845
+
+---- Candidate 1 fold 5/5: 9675 training images, 2418 validation images ----
+  [c1 fold 5/5] epoch   1 | lr 1.0e-03 | train F 0.7754 acc 0.6742 | val F 0.7681 acc 0.6820 f1 0.6769 kappa 0.6076 score 0.6423
+  [c1 fold 5/5] epoch  10 | lr 1.0e-03 | train F 0.3956 acc 0.8816 | val F 0.4759 acc 0.8581 f1 0.8477 kappa 0.8215 score 0.8346
+  [c1 fold 5/5] epoch  20 | lr 1.0e-03 | train F 0.2992 acc 0.9234 | val F 0.4240 acc 0.8743 f1 0.8641 kappa 0.8419 score 0.8530
+  [c1 fold 5/5] epoch  30 | lr 1.0e-03 | train F 0.2617 acc 0.9335 | val F 0.4225 acc 0.8664 f1 0.8609 kappa 0.8319 score 0.8464
+  [c1 fold 5/5] epoch  40 | lr 1.0e-03 | train F 0.2084 acc 0.9600 | val F 0.4008 acc 0.8896 f1 0.8765 kappa 0.8606 score 0.8685
+  [c1 fold 5/5] epoch  50 | lr 1.0e-03 | train F 0.1959 acc 0.9637 | val F 0.4015 acc 0.8888 f1 0.8792 kappa 0.8596 score 0.8694
+  [c1 fold 5/5] epoch  60 | lr 5.0e-04 | train F 0.1531 acc 0.9778 | val F 0.3839 acc 0.8912 f1 0.8843 kappa 0.8627 score 0.8735
+  [c1 fold 5/5] epoch  70 | lr 2.5e-04 | train F 0.1373 acc 0.9838 | val F 0.3774 acc 0.8962 f1 0.8903 kappa 0.8691 score 0.8797
+  [c1 fold 5/5] epoch  80 | lr 2.5e-04 | train F 0.1307 acc 0.9874 | val F 0.3742 acc 0.9003 f1 0.8944 kappa 0.8742 score 0.8843
+  [c1 fold 5/5] epoch  90 | lr 1.3e-04 | train F 0.1235 acc 0.9874 | val F 0.3708 acc 0.9016 f1 0.8960 kappa 0.8757 score 0.8858
+  [c1 fold 5/5] epoch 100 | lr 1.3e-04 | train F 0.1211 acc 0.9898 | val F 0.3724 acc 0.8991 f1 0.8932 kappa 0.8725 score 0.8829
+  [c1 fold 5/5] epoch 110 | lr 6.3e-05 | train F 0.1195 acc 0.9905 | val F 0.3725 acc 0.9057 f1 0.8986 kappa 0.8809 score 0.8898
+  [c1 fold 5/5] epoch 120 | lr 3.1e-05 | train F 0.1179 acc 0.9906 | val F 0.3700 acc 0.9053 f1 0.8974 kappa 0.8804 score 0.8889
+  [c1 fold 5/5] epoch 130 | lr 7.8e-06 | train F 0.1176 acc 0.9905 | val F 0.3703 acc 0.9036 f1 0.8963 kappa 0.8783 score 0.8873
+  [c1 fold 5/5] stopped at epoch 135, best epoch 115 (74 s): train acc 0.9907 | val acc 0.9057 f1 0.8996 kappa 0.8809 score 0.8902
+  validation with 5 TTA views: score 0.9033
+  test of this model alone (information only): score 0.8869 | with 5 TTA views 0.9003
+  candidate 1: out-of-fold score with TTA 0.8945 (whole image 0.8825) | test of its 5 models with TTA 0.9028 (information only)
+
+================ CANDIDATE 2/3: 5-fold cross-validation ================
+Settings: r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+
+---- Candidate 2 fold 1/5: 9674 training images, 2419 validation images ----
+  [c2 fold 1/5] epoch   1 | lr 1.0e-03 | train F 0.8890 acc 0.6296 | val F 0.9177 acc 0.6205 f1 0.6203 kappa 0.5402 score 0.5802
+  [c2 fold 1/5] epoch  10 | lr 1.0e-03 | train F 0.4076 acc 0.8855 | val F 0.5084 acc 0.8454 f1 0.8363 kappa 0.8058 score 0.8210
+  [c2 fold 1/5] epoch  20 | lr 1.0e-03 | train F 0.2972 acc 0.9250 | val F 0.4530 acc 0.8582 f1 0.8505 kappa 0.8216 score 0.8360
+  [c2 fold 1/5] epoch  30 | lr 1.0e-03 | train F 0.2279 acc 0.9486 | val F 0.4343 acc 0.8681 f1 0.8594 kappa 0.8340 score 0.8467
+  [c2 fold 1/5] epoch  40 | lr 1.0e-03 | train F 0.1961 acc 0.9606 | val F 0.4275 acc 0.8780 f1 0.8670 kappa 0.8464 score 0.8567
+  [c2 fold 1/5] epoch  50 | lr 5.0e-04 | train F 0.1578 acc 0.9774 | val F 0.4029 acc 0.8888 f1 0.8820 kappa 0.8597 score 0.8709
+  [c2 fold 1/5] epoch  60 | lr 2.5e-04 | train F 0.1417 acc 0.9829 | val F 0.4084 acc 0.8892 f1 0.8793 kappa 0.8601 score 0.8697
+  [c2 fold 1/5] epoch  70 | lr 1.3e-04 | train F 0.1330 acc 0.9861 | val F 0.4038 acc 0.8917 f1 0.8822 kappa 0.8633 score 0.8727
+  [c2 fold 1/5] epoch  80 | lr 3.1e-05 | train F 0.1283 acc 0.9864 | val F 0.4018 acc 0.8900 f1 0.8821 kappa 0.8612 score 0.8717
+  [c2 fold 1/5] epoch  90 | lr 1.6e-05 | train F 0.1266 acc 0.9871 | val F 0.4020 acc 0.8917 f1 0.8836 kappa 0.8633 score 0.8735
+  [c2 fold 1/5] stopped at epoch 97, best epoch 77 (64 s): train acc 0.9871 | val acc 0.8929 f1 0.8837 kappa 0.8649 score 0.8743
+  validation with 5 TTA views: score 0.8982
+  test of this model alone (information only): score 0.8897 | with 5 TTA views 0.8975
+
+---- Candidate 2 fold 2/5: 9674 training images, 2419 validation images ----
+  [c2 fold 2/5] epoch   1 | lr 1.0e-03 | train F 0.7706 acc 0.6875 | val F 0.8097 acc 0.6680 f1 0.6579 kappa 0.5930 score 0.6254
+  [c2 fold 2/5] epoch  10 | lr 1.0e-03 | train F 0.3875 acc 0.8902 | val F 0.4957 acc 0.8284 f1 0.8236 kappa 0.7848 score 0.8042
+  [c2 fold 2/5] epoch  20 | lr 1.0e-03 | train F 0.2933 acc 0.9195 | val F 0.4471 acc 0.8442 f1 0.8360 kappa 0.8046 score 0.8203
+  [c2 fold 2/5] epoch  30 | lr 1.0e-03 | train F 0.2274 acc 0.9492 | val F 0.4160 acc 0.8636 f1 0.8597 kappa 0.8283 score 0.8440
+  [c2 fold 2/5] epoch  40 | lr 1.0e-03 | train F 0.1931 acc 0.9674 | val F 0.4269 acc 0.8723 f1 0.8682 kappa 0.8387 score 0.8535
+  [c2 fold 2/5] epoch  50 | lr 1.0e-03 | train F 0.1706 acc 0.9729 | val F 0.4031 acc 0.8760 f1 0.8736 kappa 0.8437 score 0.8587
+  [c2 fold 2/5] epoch  60 | lr 5.0e-04 | train F 0.1387 acc 0.9830 | val F 0.3908 acc 0.8698 f1 0.8665 kappa 0.8358 score 0.8511
+  [c2 fold 2/5] epoch  70 | lr 2.5e-04 | train F 0.1225 acc 0.9888 | val F 0.3784 acc 0.8838 f1 0.8803 kappa 0.8534 score 0.8668
+  [c2 fold 2/5] epoch  80 | lr 1.3e-04 | train F 0.1198 acc 0.9902 | val F 0.3831 acc 0.8809 f1 0.8785 kappa 0.8498 score 0.8641
+  [c2 fold 2/5] stopped at epoch 89, best epoch 69 (60 s): train acc 0.9877 | val acc 0.8847 f1 0.8818 kappa 0.8544 score 0.8681
+  validation with 5 TTA views: score 0.8798
+  test of this model alone (information only): score 0.8776 | with 5 TTA views 0.8941
+
+---- Candidate 2 fold 3/5: 9674 training images, 2419 validation images ----
+  [c2 fold 3/5] epoch   1 | lr 1.0e-03 | train F 0.8267 acc 0.6556 | val F 0.8808 acc 0.6449 f1 0.6396 kappa 0.5646 score 0.6021
+  [c2 fold 3/5] epoch  10 | lr 1.0e-03 | train F 0.3781 acc 0.8951 | val F 0.4991 acc 0.8437 f1 0.8305 kappa 0.8034 score 0.8170
+  [c2 fold 3/5] epoch  20 | lr 1.0e-03 | train F 0.2911 acc 0.9278 | val F 0.4769 acc 0.8603 f1 0.8467 kappa 0.8236 score 0.8351
+  [c2 fold 3/5] epoch  30 | lr 1.0e-03 | train F 0.2294 acc 0.9526 | val F 0.4478 acc 0.8747 f1 0.8599 kappa 0.8420 score 0.8510
+  [c2 fold 3/5] epoch  40 | lr 1.0e-03 | train F 0.1968 acc 0.9578 | val F 0.4326 acc 0.8706 f1 0.8588 kappa 0.8369 score 0.8479
+  [c2 fold 3/5] epoch  50 | lr 5.0e-04 | train F 0.1538 acc 0.9780 | val F 0.4236 acc 0.8826 f1 0.8668 kappa 0.8518 score 0.8593
+  [c2 fold 3/5] epoch  60 | lr 5.0e-04 | train F 0.1385 acc 0.9840 | val F 0.4189 acc 0.8884 f1 0.8751 kappa 0.8590 score 0.8671I0000 00:00:1793409485.311563   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1438289__.47
+I0000 00:00:1793409489.122222   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1438289__.47
+I0000 00:00:1793409550.298474   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1522232__.47
+I0000 00:00:1793409554.132986   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1522232__.47
+I0000 00:00:1793409622.312158   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1619059__.47
+I0000 00:00:1793409626.334290   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1619059__.47
+I0000 00:00:1793409676.240338   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1701436__.47
+I0000 00:00:1793409680.272069   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1701436__.47
+I0000 00:00:1793409725.263238   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1775063__.47
+I0000 00:00:1793409729.309008   23846 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1775063__.47
+
+  [c2 fold 3/5] epoch  70 | lr 2.5e-04 | train F 0.1253 acc 0.9885 | val F 0.4290 acc 0.8917 f1 0.8788 kappa 0.8630 score 0.8709
+  [c2 fold 3/5] epoch  80 | lr 1.3e-04 | train F 0.1174 acc 0.9902 | val F 0.4268 acc 0.8954 f1 0.8825 kappa 0.8677 score 0.8751
+  [c2 fold 3/5] epoch  90 | lr 6.3e-05 | train F 0.1159 acc 0.9921 | val F 0.4240 acc 0.8962 f1 0.8824 kappa 0.8688 score 0.8756
+  [c2 fold 3/5] epoch 100 | lr 3.1e-05 | train F 0.1133 acc 0.9922 | val F 0.4262 acc 0.8962 f1 0.8816 kappa 0.8687 score 0.8752
+  [c2 fold 3/5] epoch 110 | lr 7.8e-06 | train F 0.1132 acc 0.9927 | val F 0.4250 acc 0.8942 f1 0.8806 kappa 0.8661 score 0.8733
+  [c2 fold 3/5] stopped at epoch 111, best epoch 91 (74 s): train acc 0.9915 | val acc 0.8975 f1 0.8832 kappa 0.8703 score 0.8767
+  validation with 5 TTA views: score 0.8893
+  test of this model alone (information only): score 0.8737 | with 5 TTA views 0.8946
+
+---- Candidate 2 fold 4/5: 9675 training images, 2418 validation images ----
+  [c2 fold 4/5] epoch   1 | lr 1.0e-03 | train F 0.7361 acc 0.7109 | val F 0.7843 acc 0.7006 f1 0.6903 kappa 0.6261 score 0.6582
+  [c2 fold 4/5] epoch  10 | lr 1.0e-03 | train F 0.3849 acc 0.8896 | val F 0.4971 acc 0.8499 f1 0.8390 kappa 0.8111 score 0.8250
+  [c2 fold 4/5] epoch  20 | lr 1.0e-03 | train F 0.2909 acc 0.9302 | val F 0.4571 acc 0.8685 f1 0.8615 kappa 0.8340 score 0.8478
+  [c2 fold 4/5] epoch  30 | lr 1.0e-03 | train F 0.2281 acc 0.9434 | val F 0.4288 acc 0.8718 f1 0.8645 kappa 0.8385 score 0.8515
+  [c2 fold 4/5] epoch  40 | lr 1.0e-03 | train F 0.1973 acc 0.9613 | val F 0.4258 acc 0.8763 f1 0.8692 kappa 0.8440 score 0.8566
+  [c2 fold 4/5] epoch  50 | lr 1.0e-03 | train F 0.1745 acc 0.9695 | val F 0.4154 acc 0.8797 f1 0.8713 kappa 0.8483 score 0.8598
+  [c2 fold 4/5] epoch  60 | lr 1.0e-03 | train F 0.1489 acc 0.9792 | val F 0.3967 acc 0.8925 f1 0.8866 kappa 0.8642 score 0.8754
+  [c2 fold 4/5] epoch  70 | lr 5.0e-04 | train F 0.1356 acc 0.9857 | val F 0.4046 acc 0.8908 f1 0.8847 kappa 0.8621 score 0.8734
+  [c2 fold 4/5] epoch  80 | lr 5.0e-04 | train F 0.1210 acc 0.9916 | val F 0.4015 acc 0.8966 f1 0.8878 kappa 0.8694 score 0.8786
+  [c2 fold 4/5] epoch  90 | lr 2.5e-04 | train F 0.1151 acc 0.9939 | val F 0.4010 acc 0.8970 f1 0.8885 kappa 0.8698 score 0.8791
+  [c2 fold 4/5] stopped at epoch 93, best epoch 73 (63 s): train acc 0.9898 | val acc 0.8987 f1 0.8905 kappa 0.8720 score 0.8813
+  validation with 5 TTA views: score 0.8865
+  test of this model alone (information only): score 0.8806 | with 5 TTA views 0.8877
+
+---- Candidate 2 fold 5/5: 9675 training images, 2418 validation images ----
+  [c2 fold 5/5] epoch   1 | lr 1.0e-03 | train F 0.7647 acc 0.6811 | val F 0.7727 acc 0.6787 f1 0.6747 kappa 0.6006 score 0.6377
+  [c2 fold 5/5] epoch  10 | lr 1.0e-03 | train F 0.3953 acc 0.8798 | val F 0.4885 acc 0.8495 f1 0.8391 kappa 0.8109 score 0.8250
+  [c2 fold 5/5] epoch  20 | lr 1.0e-03 | train F 0.2848 acc 0.9265 | val F 0.4287 acc 0.8739 f1 0.8630 kappa 0.8412 score 0.8521
+  [c2 fold 5/5] epoch  30 | lr 1.0e-03 | train F 0.2452 acc 0.9416 | val F 0.4331 acc 0.8739 f1 0.8671 kappa 0.8411 score 0.8541
+  [c2 fold 5/5] epoch  40 | lr 1.0e-03 | train F 0.1950 acc 0.9604 | val F 0.4062 acc 0.8871 f1 0.8733 kappa 0.8576 score 0.8655
+  [c2 fold 5/5] epoch  50 | lr 1.0e-03 | train F 0.1838 acc 0.9723 | val F 0.4174 acc 0.8875 f1 0.8798 kappa 0.8579 score 0.8688
+  [c2 fold 5/5] epoch  60 | lr 5.0e-04 | train F 0.1412 acc 0.9832 | val F 0.3975 acc 0.8892 f1 0.8806 kappa 0.8599 score 0.8702
+  [c2 fold 5/5] epoch  70 | lr 2.5e-04 | train F 0.1288 acc 0.9881 | val F 0.3896 acc 0.8966 f1 0.8854 kappa 0.8694 score 0.8774
+  [c2 fold 5/5] epoch  80 | lr 1.3e-04 | train F 0.1204 acc 0.9901 | val F 0.3822 acc 0.8978 f1 0.8891 kappa 0.8709 score 0.8800
+  [c2 fold 5/5] epoch  90 | lr 1.3e-04 | train F 0.1187 acc 0.9908 | val F 0.3777 acc 0.9024 f1 0.8946 kappa 0.8767 score 0.8856
+  [c2 fold 5/5] epoch 100 | lr 1.3e-04 | train F 0.1156 acc 0.9918 | val F 0.3800 acc 0.9020 f1 0.8930 kappa 0.8761 score 0.8845
+  [c2 fold 5/5] stopped at epoch 108, best epoch 88 (71 s): train acc 0.9909 | val acc 0.9041 f1 0.8944 kappa 0.8786 score 0.8865
+  validation with 5 TTA views: score 0.9051
+  test of this model alone (information only): score 0.8852 | with 5 TTA views 0.8992
+  candidate 2: out-of-fold score with TTA 0.8918 (whole image 0.8774) | test of its 5 models with TTA 0.9008 (information only)
+
+================ CANDIDATE 3/3: 5-fold cross-validation ================
+Settings: r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+
+---- Candidate 3 fold 1/5: 9674 training images, 2419 validation images ----
+  [c3 fold 1/5] epoch   1 | lr 1.0e-03 | train F 0.8112 acc 0.6559 | val F 0.8357 acc 0.6519 f1 0.6428 kappa 0.5753 score 0.6090
+  [c3 fold 1/5] epoch  10 | lr 1.0e-03 | train F 0.4131 acc 0.8734 | val F 0.5086 acc 0.8289 f1 0.8168 kappa 0.7856 score 0.8012
+  [c3 fold 1/5] epoch  20 | lr 1.0e-03 | train F 0.3147 acc 0.9125 | val F 0.4507 acc 0.8566 f1 0.8442 kappa 0.8199 score 0.8321
+  [c3 fold 1/5] epoch  30 | lr 1.0e-03 | train F 0.2602 acc 0.9347 | val F 0.4515 acc 0.8640 f1 0.8513 kappa 0.8291 score 0.8402
+  [c3 fold 1/5] epoch  40 | lr 1.0e-03 | train F 0.2211 acc 0.9500 | val F 0.4293 acc 0.8669 f1 0.8558 kappa 0.8325 score 0.8442
+  [c3 fold 1/5] epoch  50 | lr 1.0e-03 | train F 0.1955 acc 0.9630 | val F 0.4044 acc 0.8797 f1 0.8703 kappa 0.8483 score 0.8593
+  [c3 fold 1/5] epoch  60 | lr 5.0e-04 | train F 0.1542 acc 0.9782 | val F 0.3962 acc 0.8938 f1 0.8874 kappa 0.8659 score 0.8767
+  [c3 fold 1/5] epoch  70 | lr 2.5e-04 | train F 0.1417 acc 0.9828 | val F 0.3898 acc 0.8933 f1 0.8848 kappa 0.8654 score 0.8751
+  [c3 fold 1/5] epoch  80 | lr 1.3e-04 | train F 0.1336 acc 0.9849 | val F 0.3877 acc 0.8967 f1 0.8867 kappa 0.8694 score 0.8781
+  [c3 fold 1/5] epoch  90 | lr 1.3e-04 | train F 0.1269 acc 0.9875 | val F 0.3873 acc 0.8938 f1 0.8860 kappa 0.8658 score 0.8759
+  [c3 fold 1/5] stopped at epoch 91, best epoch 71 (53 s): train acc 0.9824 | val acc 0.9012 f1 0.8953 kappa 0.8753 score 0.8853
+  validation with 5 TTA views: score 0.9027
+  test of this model alone (information only): score 0.8840 | with 5 TTA views 0.8939
+
+---- Candidate 3 fold 2/5: 9674 training images, 2419 validation images ----
+  [c3 fold 2/5] epoch   1 | lr 1.0e-03 | train F 0.7463 acc 0.6984 | val F 0.7878 acc 0.6800 f1 0.6736 kappa 0.6062 score 0.6399
+  [c3 fold 2/5] epoch  10 | lr 1.0e-03 | train F 0.4059 acc 0.8721 | val F 0.5098 acc 0.8165 f1 0.8114 kappa 0.7700 score 0.7907
+  [c3 fold 2/5] epoch  20 | lr 1.0e-03 | train F 0.3036 acc 0.9169 | val F 0.4505 acc 0.8442 f1 0.8365 kappa 0.8049 score 0.8207
+  [c3 fold 2/5] epoch  30 | lr 1.0e-03 | train F 0.2530 acc 0.9420 | val F 0.4252 acc 0.8623 f1 0.8639 kappa 0.8266 score 0.8452
+  [c3 fold 2/5] epoch  40 | lr 1.0e-03 | train F 0.2122 acc 0.9591 | val F 0.4296 acc 0.8727 f1 0.8660 kappa 0.8393 score 0.8526
+  [c3 fold 2/5] epoch  50 | lr 1.0e-03 | train F 0.1821 acc 0.9680 | val F 0.4006 acc 0.8768 f1 0.8714 kappa 0.8447 score 0.8580
+  [c3 fold 2/5] epoch  60 | lr 1.0e-03 | train F 0.1705 acc 0.9734 | val F 0.3940 acc 0.8780 f1 0.8723 kappa 0.8462 score 0.8592
+  [c3 fold 2/5] epoch  70 | lr 5.0e-04 | train F 0.1357 acc 0.9828 | val F 0.3811 acc 0.8826 f1 0.8792 kappa 0.8519 score 0.8655
+  [c3 fold 2/5] epoch  80 | lr 5.0e-04 | train F 0.1306 acc 0.9857 | val F 0.3829 acc 0.8863 f1 0.8850 kappa 0.8566 score 0.8708
+  [c3 fold 2/5] stopped at epoch 81, best epoch 61 (48 s): train acc 0.9760 | val acc 0.8900 f1 0.8883 kappa 0.8613 score 0.8748
+  validation with 5 TTA views: score 0.8781
+  test of this model alone (information only): score 0.8712 | with 5 TTA views 0.8840
+
+---- Candidate 3 fold 3/5: 9674 training images, 2419 validation images ----
+  [c3 fold 3/5] epoch   1 | lr 1.0e-03 | train F 0.8066 acc 0.6574 | val F 0.8635 acc 0.6437 f1 0.6371 kappa 0.5642 score 0.6006
+  [c3 fold 3/5] epoch  10 | lr 1.0e-03 | train F 0.3947 acc 0.8909 | val F 0.5070 acc 0.8442 f1 0.8342 kappa 0.8037 score 0.8190
+  [c3 fold 3/5] epoch  20 | lr 1.0e-03 | train F 0.3004 acc 0.9257 | val F 0.4582 acc 0.8714 f1 0.8591 kappa 0.8376 score 0.8484I0000 00:00:1793409794.085534   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1884981__.47
+I0000 00:00:1793409798.121253   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1884981__.47
+I0000 00:00:1793409848.423271   23848 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1967392__.47
+I0000 00:00:1793409852.492883   23847 dot_merger.cc:481] Merging Dots in computation: a_inference_one_step_on_data_1967392__.47
+
+  [c3 fold 3/5] epoch  30 | lr 1.0e-03 | train F 0.2519 acc 0.9393 | val F 0.4452 acc 0.8677 f1 0.8548 kappa 0.8333 score 0.8441
+  [c3 fold 3/5] epoch  40 | lr 1.0e-03 | train F 0.2255 acc 0.9454 | val F 0.4416 acc 0.8718 f1 0.8614 kappa 0.8384 score 0.8499
+  [c3 fold 3/5] epoch  50 | lr 1.0e-03 | train F 0.1843 acc 0.9651 | val F 0.4268 acc 0.8830 f1 0.8711 kappa 0.8523 score 0.8617
+  [c3 fold 3/5] epoch  60 | lr 5.0e-04 | train F 0.1522 acc 0.9792 | val F 0.4074 acc 0.8938 f1 0.8814 kappa 0.8658 score 0.8736
+  [c3 fold 3/5] epoch  70 | lr 2.5e-04 | train F 0.1344 acc 0.9839 | val F 0.4101 acc 0.8946 f1 0.8829 kappa 0.8667 score 0.8748
+  [c3 fold 3/5] epoch  80 | lr 1.3e-04 | train F 0.1287 acc 0.9872 | val F 0.4105 acc 0.8954 f1 0.8841 kappa 0.8677 score 0.8759
+  [c3 fold 3/5] epoch  90 | lr 1.3e-04 | train F 0.1271 acc 0.9885 | val F 0.4075 acc 0.8995 f1 0.8887 kappa 0.8730 score 0.8808
+  [c3 fold 3/5] epoch 100 | lr 6.3e-05 | train F 0.1220 acc 0.9887 | val F 0.4083 acc 0.8991 f1 0.8869 kappa 0.8725 score 0.8797
+  [c3 fold 3/5] epoch 110 | lr 3.1e-05 | train F 0.1209 acc 0.9902 | val F 0.4069 acc 0.8975 f1 0.8847 kappa 0.8704 score 0.8776
+  [c3 fold 3/5] epoch 120 | lr 1.6e-05 | train F 0.1207 acc 0.9902 | val F 0.4062 acc 0.8979 f1 0.8872 kappa 0.8709 score 0.8790
+  [c3 fold 3/5] stopped at epoch 123, best epoch 103 (68 s): train acc 0.9892 | val acc 0.9012 f1 0.8904 kappa 0.8751 score 0.8827
+  validation with 5 TTA views: score 0.8956
+  test of this model alone (information only): score 0.8829 | with 5 TTA views 0.8968
+
+---- Candidate 3 fold 4/5: 9675 training images, 2418 validation images ----
+  [c3 fold 4/5] epoch   1 | lr 1.0e-03 | train F 0.7386 acc 0.7030 | val F 0.7786 acc 0.6993 f1 0.6848 kappa 0.6271 score 0.6560
+  [c3 fold 4/5] epoch  10 | lr 1.0e-03 | train F 0.4077 acc 0.8821 | val F 0.5133 acc 0.8404 f1 0.8316 kappa 0.7994 score 0.8155
+  [c3 fold 4/5] epoch  20 | lr 1.0e-03 | train F 0.3166 acc 0.9134 | val F 0.4724 acc 0.8615 f1 0.8536 kappa 0.8253 score 0.8394
+  [c3 fold 4/5] epoch  30 | lr 1.0e-03 | train F 0.2433 acc 0.9377 | val F 0.4299 acc 0.8726 f1 0.8635 kappa 0.8395 score 0.8515
+  [c3 fold 4/5] epoch  40 | lr 1.0e-03 | train F 0.2061 acc 0.9587 | val F 0.4263 acc 0.8834 f1 0.8763 kappa 0.8526 score 0.8645
+  [c3 fold 4/5] epoch  50 | lr 5.0e-04 | train F 0.1640 acc 0.9733 | val F 0.3923 acc 0.8962 f1 0.8890 kappa 0.8689 score 0.8789
+  [c3 fold 4/5] epoch  60 | lr 2.5e-04 | train F 0.1503 acc 0.9806 | val F 0.3987 acc 0.8966 f1 0.8903 kappa 0.8693 score 0.8798
+  [c3 fold 4/5] epoch  70 | lr 2.5e-04 | train F 0.1408 acc 0.9822 | val F 0.3923 acc 0.8966 f1 0.8922 kappa 0.8693 score 0.8808
+  [c3 fold 4/5] epoch  80 | lr 1.3e-04 | train F 0.1323 acc 0.9857 | val F 0.3941 acc 0.8983 f1 0.8945 kappa 0.8714 score 0.8830
+  [c3 fold 4/5] epoch  90 | lr 6.3e-05 | train F 0.1284 acc 0.9876 | val F 0.3940 acc 0.8983 f1 0.8927 kappa 0.8713 score 0.8820
+  [c3 fold 4/5] stopped at epoch 91, best epoch 71 (53 s): train acc 0.9819 | val acc 0.9036 f1 0.9015 kappa 0.8782 score 0.8899
+  validation with 5 TTA views: score 0.8969
+  test of this model alone (information only): score 0.8804 | with 5 TTA views 0.8914
+
+---- Candidate 3 fold 5/5: 9675 training images, 2418 validation images ----
+  [c3 fold 5/5] epoch   1 | lr 1.0e-03 | train F 0.7786 acc 0.6797 | val F 0.7845 acc 0.6948 f1 0.6791 kappa 0.6226 score 0.6508
+  [c3 fold 5/5] epoch  10 | lr 1.0e-03 | train F 0.4140 acc 0.8766 | val F 0.4929 acc 0.8478 f1 0.8376 kappa 0.8086 score 0.8231
+  [c3 fold 5/5] epoch  20 | lr 1.0e-03 | train F 0.3106 acc 0.9169 | val F 0.4410 acc 0.8656 f1 0.8553 kappa 0.8312 score 0.8432
+  [c3 fold 5/5] epoch  30 | lr 1.0e-03 | train F 0.2622 acc 0.9337 | val F 0.4293 acc 0.8652 f1 0.8627 kappa 0.8302 score 0.8464
+  [c3 fold 5/5] epoch  40 | lr 1.0e-03 | train F 0.2080 acc 0.9587 | val F 0.4068 acc 0.8896 f1 0.8805 kappa 0.8605 score 0.8705
+  [c3 fold 5/5] epoch  50 | lr 1.0e-03 | train F 0.1932 acc 0.9630 | val F 0.3958 acc 0.8854 f1 0.8779 kappa 0.8556 score 0.8667
+  [c3 fold 5/5] stopped at epoch 58, best epoch 38 (36 s): train acc 0.9555 | val acc 0.8900 f1 0.8807 kappa 0.8614 score 0.8711
+  validation with 5 TTA views: score 0.8758
+  test of this model alone (information only): score 0.8637 | with 5 TTA views 0.8809
+  candidate 3: out-of-fold score with TTA 0.8898 (whole image 0.8807) | test of its 5 models with TTA 0.9020 (information only)
+
+================ ENSEMBLE SELECTION (out-of-fold, 12093 training images) ================
+  start with candidate 1: out-of-fold 0.8945
+  + candidate 2: out-of-fold 0.8971 -> ADDED
+  + candidate 3: out-of-fold 0.8973 -> ADDED
+Ensemble: candidate(s) [1, 2, 3] = 15 models
+Test (information only, not used to choose): best candidate alone 0.9028 | ensemble 0.8971 | ensemble + 5 TTA views 0.9079
+
+================ SAVING ================
+Saved model_Matthew1.keras (7.2 MB): r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | | fold 1 best epoch 75 validation score 0.8830
+Saved model_Matthew2.keras (7.2 MB): r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | | fold 2 best epoch 82 validation score 0.8783
+Saved model_Matthew3.keras (7.2 MB): r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | | fold 3 best epoch 68 validation score 0.8780
+Saved model_Matthew4.keras (7.2 MB): r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | | fold 4 best epoch 60 validation score 0.8829
+Saved model_Matthew5.keras (7.2 MB): r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | | fold 5 best epoch 115 validation score 0.8902
+Saved model_Matthew6.keras (10.0 MB): r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | | fold 1 best epoch 77 validation score 0.8743
+Saved model_Matthew7.keras (10.0 MB): r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | | fold 2 best epoch 69 validation score 0.8681
+Saved model_Matthew8.keras (10.0 MB): r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | | fold 3 best epoch 91 validation score 0.8767
+Saved model_Matthew9.keras (10.0 MB): r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | | fold 4 best epoch 73 validation score 0.8813
+Saved model_Matthew10.keras (10.0 MB): r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | | fold 5 best epoch 88 validation score 0.8865
+Saved model_Matthew11.keras (7.2 MB): r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidd | fold 1 best epoch 71 validation score 0.8853
+Saved model_Matthew12.keras (7.2 MB): r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidd | fold 2 best epoch 61 validation score 0.8748
+Saved model_Matthew13.keras (7.2 MB): r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidd | fold 3 best epoch 103 validation score 0.8827
+Saved model_Matthew14.keras (7.2 MB): r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidd | fold 4 best epoch 71 validation score 0.8899
+Saved model_Matthew15.keras (7.2 MB): r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidd | fold 5 best epoch 38 validation score 0.8711
+
+================ TEST (saved models, as test_Matthew.py) ================
+Check: saved models give the same predictions as the ensemble in memory for 100.00% of the test images
+f1_score macro 0.9133549677192306
+cohen_kappa_score 0.9023917228783521
+accuracy_score 0.9228395061728395
+Average of Metrics :  0.9128620655901408
+Confusion matrix (rows = true, columns = predicted), classes: ['class1', 'class2', 'class3', 'class4', 'class5', 'class6']
+[[189  11   3   4  22  11]
+ [  8 446   7   2   0  15]
+ [  1   2 659   2   3  26]
+ [  3   1   4 167   0   3]
+ [ 15   3   0   0 259   2]
+ [  4   9  34   5   0 672]]
+Recall per class: class1 0.79 class2 0.93 class3 0.95 class4 0.94 class5 0.93 class6 0.93
+Leaderboard formula (F1 + kappa)/2 on test: 0.9079
+Run logged in /home/ubuntu/DL_ImageClassification/Code/experiments_Matthew.csv and /home/ubuntu/DL_ImageClassification/Code/grid_Matthew.csv
+Submit: test_Matthew.py, model_Matthew1.keras, model_Matthew2.keras, model_Matthew3.keras, model_Matthew4.keras, model_Matthew5.keras, model_Matthew6.keras, model_Matthew7.keras, model_Matthew8.keras, model_Matthew9.keras, model_Matthew10.keras, model_Matthew11.keras, model_Matthew12.keras, model_Matthew13.keras, model_Matthew14.keras, model_Matthew15.keras, summary_Matthew.txt, results_Matthew.xlsx

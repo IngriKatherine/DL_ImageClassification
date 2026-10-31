@@ -1,0 +1,50 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1793396397.893566   11381 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+I0000 00:00:1793396409.119949   11381 gpu_device.cc:2043] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 20795 MB memory:  -> device: 0, name: NVIDIA A10G, pci bus id: 0000:00:1e.0, compute capability: 8.6
+E0000 00:00:1793396617.649227   11515 jpeg_mem.cc:331] Premature end of JPEG data. Stopped at line 178/334
+W0000 00:00:1793396617.803552   11381 local_rendezvous.cc:412] Local rendezvous is aborting with status: INVALID_ARGUMENT: jpeg::Uncompress failed. Invalid JPEG data or crop window.
+	 [[{{node DecodeJpeg}}]]
+Grid: 7 combinations x 1 seed(s) = 7 runs, then 5 fold models for each of the 3 best combination(s)
+  1. r8 | feat=V1-spread | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  2. r8 | feat=V1-spread-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  3. r8 | feat=V1-spread-blob | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  4. r8 | feat=V1-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  5. r8 | feat=V1-lab-tile-spread-blob-meta | aug=4 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  6. r4 | feat=V1-lab-tile-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+  7. r4 | feat=V1-spread-meta | aug=2 | mixup=0.2 | ls=0.1 | hidden=[1024, 512, 256] | dropout=0.4 | wd=0.0 | lr=0.001 | batch=64 | cw=balanced
+
+==== Features, ratio 8: groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-lab-tile-spread-blob-meta (1772 values), 4 augmented view(s), 5 TTA view(s) ====
+Computing the features of 14685 images, view orig, ratio 8, groups hs-v-mom-exr-lbp-lbp2-lbp4-grad-ctr-thumb-lab-tile-spread-blob ...
+  features (orig):   1024 / 14685 images  (20 images/s, 11.1 min left)
+  features (orig):   2048 / 14685 images  (21 images/s, 10.2 min left)
+  features (orig):   3072 / 14685 images  (21 images/s, 9.3 min left)
+  features (orig):   4096 / 14685 images  (21 images/s, 8.4 min left)
+Traceback (most recent call last):
+  File "/home/ubuntu/DL_ImageClassification/Code/train_Matthew.py", line 1750, in <module>
+    main()
+    ~~~~^^
+  File "/home/ubuntu/DL_ImageClassification/Code/train_Matthew.py", line 1509, in main
+    X_all = load_feature_cache(ids, 'orig', ratio, used)[:, keep]
+            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/DL_ImageClassification/Code/train_Matthew.py", line 737, in load_feature_cache
+    X_new = extract_features([DATA_DIR + i for i in missing], seeds, groups, ratio, view)
+  File "/home/ubuntu/DL_ImageClassification/Code/train_Matthew.py", line 641, in extract_features
+    for xb in ds:
+              ^^
+  File "/home/ubuntu/dl-venv/lib/python3.13/site-packages/tensorflow/python/data/ops/iterator_ops.py", line 826, in __next__
+    return self._next_internal()
+           ~~~~~~~~~~~~~~~~~~~^^
+  File "/home/ubuntu/dl-venv/lib/python3.13/site-packages/tensorflow/python/data/ops/iterator_ops.py", line 776, in _next_internal
+    ret = gen_dataset_ops.iterator_get_next(
+        self._iterator_resource,
+        output_types=self._flat_output_types,
+        output_shapes=self._flat_output_shapes)
+  File "/home/ubuntu/dl-venv/lib/python3.13/site-packages/tensorflow/python/ops/gen_dataset_ops.py", line 3086, in iterator_get_next
+    _ops.raise_from_not_ok_status(e, name)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/ubuntu/dl-venv/lib/python3.13/site-packages/tensorflow/python/framework/ops.py", line 6027, in raise_from_not_ok_status
+    raise core._status_to_exception(e) from None  # pylint: disable=protected-access
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tensorflow.python.framework.errors_impl.InvalidArgumentError: {{function_node __wrapped__IteratorGetNext_output_types_1_device_/job:localhost/replica:0/task:0/device:CPU:0}} jpeg::Uncompress failed. Invalid JPEG data or crop window.
+	 [[{{node DecodeJpeg}}]] [Op:IteratorGetNext] name: 
